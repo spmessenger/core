@@ -1,0 +1,6 @@
+class AbstractMessageRepo:
+    ...
+
+
+class InMemoryMessageRepo:
+    ...
