@@ -7,9 +7,9 @@ UserId = NewType("UserId", int)
 
 class User(Base):
     id: UserId
-    name: str
-    phone: str
+    username: str
+    hashed_password: str
 
     class Creation(Base.Creation):
-        name: str
-        phone: str
+        username: str
+        hashed_password: str

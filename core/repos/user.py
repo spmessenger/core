@@ -16,8 +16,8 @@ class InMemoryUserRepo(AbstractUserRepo):
         self._last_id += 1
         entity = User(
             id=self._last_id,
-            name=user.name,
-            phone=user.phone,
+            username=user.username,
+            hashed_password=user.hashed_password,
         )
         self._storage.append(entity)
         return entity
