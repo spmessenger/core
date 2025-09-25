@@ -3,10 +3,10 @@ name = "core"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Your Name",email = "you@example.com"}
+    {name = "Egor Bogdanov",email = "ro9aine@gmail.com"},
 ]
 readme = "README.md"
-requires-python = "3.11"
+requires-python = ">=3.11"
 dependencies = [
     "pydantic (>=2.11.9,<3.0.0)",
     "pytest (>=8.4.2,<9.0.0)",

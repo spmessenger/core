@@ -1,4 +1,4 @@
-from core.services.registration import RegistrationService
+from core.services.auth import RegistrationService
 from core.repos.user import InMemoryUserRepo
 from core.repos.chat import InMemoryChatRepo
 from core.repos.participant import InMemoryParticipantRepo
