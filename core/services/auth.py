@@ -5,7 +5,7 @@ from core.repos.participant import AbstractParticipantRepo
 from core.entities.chat import ChatType
 
 
-class RegistrationService:
+class AuthService:
     def __init__(self, user_repo: AbstractUserRepo, chat_repo: AbstractChatRepo, participant_repo: AbstractParticipantRepo):
         self.chat_repo = chat_repo
         self.user_repo = user_repo
