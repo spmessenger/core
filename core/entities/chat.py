@@ -1,11 +1,12 @@
 from enum import StrEnum
+from pydantic import Field
 from .base import Base
-
 
 
 class ChatType(StrEnum):
     GROUP = 'group'
     PRIVATE = 'private'
+
 
 class Chat(Base):
     id: int

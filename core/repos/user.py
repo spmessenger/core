@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from core.entities.user import User
+from .base import InMemoryRepo
 
 
 class AbstractUserRepo(ABC):
@@ -12,7 +13,7 @@ class AbstractUserRepo(ABC):
         pass
 
 
-class InMemoryUserRepo(AbstractUserRepo):
+class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
     _storage: list[User] = []
     _last_id: int = 0
 
@@ -23,11 +24,9 @@ class InMemoryUserRepo(AbstractUserRepo):
         return None
 
     def save(self, user: User.Creation) -> User:
-        self._last_id += 1
         entity = User(
             id=self._last_id,
             username=user.username,
             hashed_password=user.hashed_password,
         )
-        self._storage.append(entity)
-        return entity
+        return self._save(entity)
