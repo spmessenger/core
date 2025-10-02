@@ -22,3 +22,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-s -v"
+
+
+[tool.flake8]
+max-line-length = 140
+ignore = []
