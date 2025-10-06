@@ -5,7 +5,7 @@ from core.repos.participant import InMemoryParticipantRepo
 from core.repos.message import InMemoryMessageRepo
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="function", autouse=True)
 def clear_in_memory_repos():
     yield
     InMemoryUserRepo._storage.clear()

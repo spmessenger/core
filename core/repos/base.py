@@ -1,13 +1,14 @@
 from typing import Generic, TypeVar
+from core.entities.base import Base
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Base)
 
 
 class InMemoryRepo(Generic[T]):
     _storage: list[T] = []
     _last_id: int = 0
 
-    def _check(self, entity: T) -> T:
+    def _check(self, entity: T):
         for key, value in entity.__class__.model_fields.items():
             if value.json_schema_extra is None:
                 continue

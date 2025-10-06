@@ -10,7 +10,8 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic (>=2.11.9,<3.0.0)",
     "pytest (>=8.4.2,<9.0.0)",
-    "multipledispatch (>=1.0.0,<2.0.0)"
+    "multipledispatch (>=1.0.0,<2.0.0)",
+    "mypy (>=1.18.2,<2.0.0)"
 ]
 
 
@@ -22,8 +23,3 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-s -v"
-
-
-[tool.flake8]
-max-line-length = 140
-ignore = []

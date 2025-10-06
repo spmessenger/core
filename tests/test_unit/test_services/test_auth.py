@@ -18,7 +18,6 @@ def test_register():
 
 
 def test_double_register():
-    InMemoryUserRepo()._storage.clear()  # need to fix this
     service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
     service.register(username='test', pure_password='test')
     with pytest.raises(ValueError):
