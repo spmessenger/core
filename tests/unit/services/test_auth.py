@@ -9,7 +9,7 @@ from core.misc.utils.hash import hash_password
 
 def test_register():
     service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
-    registered_user, private_chat = service.register(username='test', pure_password='test')
+    registered_user, private_chat, _ = service.register(username='test', pure_password='test')
 
     assert registered_user.username == 'test'
     assert registered_user.hashed_password == hash_password('test')
