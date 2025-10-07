@@ -5,6 +5,10 @@ from .base import InMemoryRepo
 
 class AbstractUserRepo(ABC):
     @abstractmethod
+    def get_by_id(self, user_id: int) -> User:
+        pass
+
+    @abstractmethod
     def find_by_id(self, user_id: int) -> User | None:
         pass
 
@@ -24,6 +28,12 @@ class AbstractUserRepo(ABC):
 class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
     _storage: list[User] = []
     _last_id: int = 0
+
+    def get_by_id(self, user_id: int) -> User:
+        for user in self._storage:
+            if user.id == user_id:
+                return user
+        raise ValueError(f'User with id {user_id} not found')
 
     def find_by_id(self, user_id: int) -> User | None:
         for user in self._storage:
