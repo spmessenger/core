@@ -9,10 +9,12 @@ from core.misc.utils.hash import hash_password
 
 def test_register():
     service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
-    registered_user, private_chat, _ = service.register(username='test', pure_password='test')
+    registered_user, private_chat, auth = service.register(username='test', pure_password='test')
 
     assert registered_user.username == 'test'
     assert registered_user.hashed_password == hash_password('test')
+    assert len(registered_user.refresh_tokens) == 1
+    assert auth['refresh_token'] in registered_user.refresh_tokens
 
     assert private_chat.type == ChatType.PRIVATE
 
@@ -22,3 +24,24 @@ def test_double_register():
     service.register(username='test', pure_password='test')
     with pytest.raises(ValueError):
         service.register(username='test', pure_password='test')
+
+
+def test_register_and_login():
+    service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
+    registered_user, private_chat, auth = service.register(username='test', pure_password='test')
+    assert len(registered_user.refresh_tokens) == 1
+
+    login_user, login_auth = service.login(username='test', password='test')
+
+    assert login_user.id == registered_user.id
+    assert len(login_user.refresh_tokens) == 2
+
+
+def test_refresh_token():
+    service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
+    user, _, auth = service.register(username='test', pure_password='test')
+
+    service.refresh_token(auth['refresh_token'])
+    user = service.user_repo.find_by_id(user.id)
+
+    assert len(user.refresh_tokens) == 1

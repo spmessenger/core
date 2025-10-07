@@ -5,6 +5,10 @@ from .base import InMemoryRepo
 
 class AbstractUserRepo(ABC):
     @abstractmethod
+    def find_by_id(self, user_id: int) -> User | None:
+        pass
+
+    @abstractmethod
     def find_by_username(self, username: str) -> User | None:
         pass
 
@@ -12,16 +16,30 @@ class AbstractUserRepo(ABC):
     def save(self, user: User.Creation) -> User:
         pass
 
+    @abstractmethod
+    def update(self, user: User.Update) -> User:
+        pass
+
 
 class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
     _storage: list[User] = []
     _last_id: int = 0
+
+    def find_by_id(self, user_id: int) -> User | None:
+        for user in self._storage:
+            if user.id == user_id:
+                return user
+        return None
 
     def find_by_username(self, username: str) -> User | None:
         for user in self._storage:
             if user.username == username:
                 return user
         return None
+
+    def update(self, upd: User.Update) -> User:
+        updted_entity = self._update(upd)
+        return User.model_validate(updted_entity, from_attributes=True)
 
     def save(self, user: User.Creation) -> User:
         entity = User(

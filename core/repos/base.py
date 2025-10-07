@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 from core.entities.base import Base
 
 T = TypeVar("T", bound=Base)
@@ -18,7 +18,7 @@ class InMemoryRepo(Generic[T]):
                 if self._find_by(key, entity_val) is not None:
                     raise ValueError(f"Field {key} is not unique")
 
-    def _find_by(self, key: str, value: str) -> T | None:
+    def _find_by(self, key: str, value: Any) -> T | None:
         for entity in self._storage:
             if getattr(entity, key) == value:
                 return entity
@@ -29,4 +29,12 @@ class InMemoryRepo(Generic[T]):
         self._last_id += 1
         entity.id = self._last_id
         self._storage.append(entity)
+        return entity
+
+    def _update(self, upd_ent: Base.Update) -> T:  # todo: need to replace Base.Update with T.Update
+        entity = self._find_by('id', upd_ent.id)
+        if entity is None:
+            raise ValueError(f"Entity with id {upd_ent.id} not found")
+        for key, value in upd_ent.model_dump(exclude={'id'}, exclude_none=True).items():
+            setattr(entity, key, value)
         return entity

@@ -8,4 +8,4 @@ class Base(BaseModel):
         pass
 
     class Update(BaseModel):
-        pass
+        id: int
