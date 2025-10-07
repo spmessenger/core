@@ -1,5 +1,5 @@
 from core.misc.utils.hash import hash_password
-from core.misc.jwt import JWTTokenManager
+from core.misc.auth.jwt import JWTTokenManager
 from core.repos.user import AbstractUserRepo, User
 from core.repos.chat import AbstractChatRepo, Chat
 from core.repos.participant import AbstractParticipantRepo
