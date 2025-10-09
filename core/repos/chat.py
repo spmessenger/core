@@ -1,6 +1,11 @@
 from abc import ABC, abstractmethod
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
+from db.models import Chat as ChatModel, Participant as ParticipantModel
+from db.session import session_factory, Session
+
 from core.entities.chat import Chat, ChatType
-from .base import InMemoryRepo
+from .base import InMemoryRepo, DbRepo
 from .participant import InMemoryParticipantRepo
 
 
@@ -16,6 +21,27 @@ class AbstractChatRepo(ABC):
     @abstractmethod
     def save(self, chat: Chat.Creation) -> Chat:
         pass
+
+
+class DbChatRepo(DbRepo, AbstractChatRepo):
+    model = ChatModel
+    participant_model = ParticipantModel
+    entity_model = Chat
+
+    @session_factory
+    def find_one(self, user_id: int | None = None, type: ChatType | None = None, *, session: Session) -> Chat | None:
+        ...
+
+    @session_factory
+    def find_all_by_user_id(self, user_id: int, *, session: Session) -> list[Chat]:
+        query = (
+            select(self.model)
+            .join(self.participant_model)
+            .where(self.participant_model.user_id == user_id)
+            .options(joinedload(self.model.participants))
+        )
+        chats = session.execute(query).unique().scalars().all()
+        return [Chat.model_validate(chat, from_attributes=True) for chat in chats]
 
 
 class InMemoryChatRepo(AbstractChatRepo, InMemoryRepo[Chat]):

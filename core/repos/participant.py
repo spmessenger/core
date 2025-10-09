@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from core.entities.participant import Participant
-from .base import InMemoryRepo
+from db.models import Participant as ParticipantModel
+from .base import InMemoryRepo, DbRepo
 
 
 class AbstractParticipantRepo(ABC):
@@ -11,6 +12,11 @@ class AbstractParticipantRepo(ABC):
     @abstractmethod
     def save(self, participant: Participant.Creation) -> Participant:
         pass
+
+
+class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
+    model = ParticipantModel
+    entity_model = Participant
 
 
 class InMemoryParticipantRepo(AbstractParticipantRepo, InMemoryRepo[Participant]):
