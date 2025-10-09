@@ -1,17 +1,15 @@
 from core.misc.utils.hash import hash_password
 from core.misc.auth.jwt import JWTTokenManager
-from core.repos.user import AbstractUserRepo, User
-from core.repos.chat import AbstractChatRepo, Chat
-from core.repos.participant import AbstractParticipantRepo
-from core.entities.chat import ChatType
+from core.entities import ChatType, User, Chat
+from core.repos.abc import AbstractUserRepo
 from core.settings import settings
+from core.services.messenger import MessengerService
 
 
 class AuthService:
-    def __init__(self, user_repo: AbstractUserRepo, chat_repo: AbstractChatRepo, participant_repo: AbstractParticipantRepo):
-        self.chat_repo = chat_repo
+    def __init__(self, user_repo: AbstractUserRepo, messenger_service: MessengerService):
         self.user_repo = user_repo
-        self.participant_repo = participant_repo
+        self.messenger_service = messenger_service
         self.jwt_token_manager = JWTTokenManager(
             secret_key=settings.SECRET_KEY,
             algorithm='HS256',
@@ -34,8 +32,7 @@ class AuthService:
             username=username,
             hashed_password=hash_password(pure_password)
         ))
-        private_chat = self.chat_repo.save(
-            Chat.Creation(type=ChatType.PRIVATE))
+        private_chat = self.messenger_service.create_private_chat(user.id)
         auth = self.get_auth(user.id)
         self.user_repo.update(User.Update(id=user.id, refresh_tokens=[*user.refresh_tokens, auth['refresh_token']]))
         return user, private_chat, auth

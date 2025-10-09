@@ -1,5 +1,6 @@
 from .base import Base
 
+
 class Participant(Base):
     id: int
     chat_id: int

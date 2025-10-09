@@ -1,8 +1,6 @@
-from core.services.messenger import MessengerService
-from core.repos.message import InMemoryMessageRepo
-from core.repos.user import InMemoryUserRepo
+from core.services import MessengerService
+from tests.conftest import mem_messenger_service as messenger
 
 
-def test_messenger_service():
-    messenger = MessengerService(InMemoryMessageRepo(), InMemoryUserRepo())
-    messenger.send_message(chat_id=1, sender_id=1)
+def test_messenger_service(messenger: MessengerService):
+    messenger.create_private_chat(1)
