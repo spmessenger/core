@@ -10,6 +10,14 @@ from .base import InMemoryRepo, DbRepo
 
 class AbstractParticipantRepo(ABC):
     @abstractmethod
+    def get_one(self, id: int | None = None, chat_id: int | None = None, user_id: int | None = None) -> Participant:
+        pass
+
+    @abstractmethod
+    def find_one(self, id: int | None = None, chat_id: int | None = None, user_id: int | None = None) -> Participant | None:
+        pass
+
+    @abstractmethod
     def find_all(self, user_id: int | None = None, chat_id: int | None = None) -> list[Participant]:
         pass
 
@@ -21,6 +29,40 @@ class AbstractParticipantRepo(ABC):
 class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
     model = ParticipantModel
     entity_model = Participant
+
+    @session_factory
+    def get_one(self, id: int | None = None, chat_id: int | None = None, user_id: int | None = None, *, session: Session) -> Participant:
+        conds = (
+            cond_seq()
+            .and_(self.model.id == id)
+            .and_(self.model.chat_id == chat_id)
+            .and_(self.model.user_id == user_id)
+        )
+        query = (
+            select(self.model)
+            .where(*conds.and_clauses)
+        )
+        participant = session.execute(query).scalar_one_or_none()
+        if participant is None:
+            raise ValueError(f'Participant with id {id} not found')
+        return Participant.model_validate(participant, from_attributes=True)
+
+    @session_factory
+    def find_one(self, id: int | None = None, chat_id: int | None = None, user_id: int | None = None, *, session: Session) -> Participant | None:
+        conds = (
+            cond_seq()
+            .and_(self.model.id == id)
+            .and_(self.model.chat_id == chat_id)
+            .and_(self.model.user_id == user_id)
+        )
+        query = (
+            select(self.model)
+            .where(*conds.and_clauses)
+        )
+        participant = session.execute(query).scalar_one_or_none()
+        if participant is None:
+            return None
+        return Participant.model_validate(participant, from_attributes=True)
 
     @session_factory
     def find_all(self, user_id: int | None = None, chat_id: int | None = None, *, session: Session) -> list[Participant]:

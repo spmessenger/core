@@ -39,7 +39,6 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
         query = (
             select(self.model)
             .where(self.model.id == user_id)
-            .limit(1)
         )
         user = session.execute(query).scalar_one_or_none()
         if user is None:
@@ -51,7 +50,6 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
         query = (
             select(self.model)
             .where(self.model.id == user_id)
-            .limit(1)
         )
         user = session.execute(query).scalar_one()
         if user is None:
@@ -63,7 +61,6 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
         query = (
             select(self.model)
             .where(self.model.username == username)
-            .limit(1)
         )
         user = session.execute(query).scalar_one()
         if user is None:

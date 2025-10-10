@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from core.entities.message import Message
 from db.models import Message as ModelMessage
-from .base import InMemoryRepo
+from db.session import session_factory, Session
+from .base import InMemoryRepo, DbRepo
 
 
 class AbstractMessageRepo(ABC):
@@ -10,11 +11,13 @@ class AbstractMessageRepo(ABC):
         pass
 
 
-class DbMessageRepo():
+class DbMessageRepo(DbRepo, AbstractMessageRepo):
     model = ModelMessage
+    entity_model = Message
 
-    def save(self, message: Message.Creation) -> Message:
-        ...
+    @session_factory
+    def save(self, message: Message.Creation, *, session: Session) -> Message:
+        return super().save(message, session=session)
 
 
 class InMemoryMessageRepo(AbstractMessageRepo, InMemoryRepo[Message]):

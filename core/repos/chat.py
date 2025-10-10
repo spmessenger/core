@@ -44,7 +44,6 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
             .join(self.participant_model)
             .where(self.model.type == ChatType.PRIVATE)
             .where(self.participant_model.user_id == user_id)
-            .limit(1)
         )
         chat = session.execute(query).scalar_one_or_none()
         if chat is None:
@@ -56,7 +55,6 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         query = (
             select(self.model)
             .where(self.model.id == chat_id)
-            .limit(1)
         )
         chat = session.execute(query).scalar_one_or_none()
         if chat is None:

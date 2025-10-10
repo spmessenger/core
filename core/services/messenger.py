@@ -1,4 +1,4 @@
-from core.entities import Chat, ChatType, Participant
+from core.entities import Chat, ChatType, Participant, Message
 from core.repos.abc import AbstractChatRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
 
 
@@ -22,5 +22,7 @@ class MessengerService:
         participant = self.participant_repo.save(Participant.Creation(chat_id=chat.id, user_id=user_id))
         return chat, participant
 
-    def send_message(self, chat_id: int, sender_id: int):
-        pass
+    def send_message(self, chat_id: int, sender_id: int, content: str) -> Message:
+        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=sender_id)
+        message = self.message_repo.save(Message.Creation(chat_id=chat_id, participant_id=participant.id, content=content))
+        return message

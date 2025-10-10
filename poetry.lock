@@ -381,7 +381,7 @@ sqlalchemy = {version = ">=2.0.43,<3.0.0", extras = ["asyncio"]}
 type = "git"
 url = "https://gitlab.com/messenger910539/db.git"
 reference = "main"
-resolved_reference = "4a995a86bd972425e5a57054c410cbe0a30c2eb9"
+resolved_reference = "25436204eba79a4cf75abdb6580a6845cebda9b9"
 
 [[package]]
 name = "ecdsa"
