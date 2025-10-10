@@ -10,7 +10,7 @@ T = TypeVar("T", bound=Base)
 
 class DbRepo(Generic[T]):
     model: DbBase
-    entity_model: Base
+    entity_model: T
 
     @asession_factory
     async def adelete(self, id: int, *, session: AsyncSession) -> bool:

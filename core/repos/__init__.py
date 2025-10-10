@@ -1,7 +1,7 @@
-from .chat import InMemoryChatRepo
-from .participant import InMemoryParticipantRepo
-from .user import InMemoryUserRepo
-from .message import InMemoryMessageRepo
+from .chat import InMemoryChatRepo, DbChatRepo
+from .participant import InMemoryParticipantRepo, DbParticipantRepo
+from .user import InMemoryUserRepo, DbUserRepo
+from .message import InMemoryMessageRepo, DbMessageRepo
 
 
 __all__ = [
@@ -9,4 +9,8 @@ __all__ = [
     'InMemoryParticipantRepo',
     'InMemoryUserRepo',
     'InMemoryMessageRepo',
+    'DbChatRepo',
+    'DbUserRepo',
+    'DbMessageRepo',
+    'DbParticipantRepo',
 ]

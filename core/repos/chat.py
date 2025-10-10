@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from db.models import Chat as ChatModel, Participant as ParticipantModel
 from db.session import session_factory, Session
+from db.misc.cond import cond_seq
 
 from core.entities.chat import Chat, ChatType
 from .base import InMemoryRepo, DbRepo
@@ -11,7 +12,15 @@ from .participant import InMemoryParticipantRepo
 
 class AbstractChatRepo(ABC):
     @abstractmethod
-    def find_one(self, user_id: int | None = None, type: ChatType | None = None) -> Chat | None:
+    def get_by_id(self, chat_id: int) -> Chat:
+        pass
+
+    @abstractmethod
+    def find_private_chat(self, user_id: int) -> Chat | None:
+        pass
+
+    @abstractmethod
+    def find_all(self, user_id: int | None = None, type: ChatType | None = None) -> Chat | None:
         pass
 
     @abstractmethod
@@ -29,8 +38,46 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
     entity_model = Chat
 
     @session_factory
-    def find_one(self, user_id: int | None = None, type: ChatType | None = None, *, session: Session) -> Chat | None:
-        ...
+    def find_private_chat(self, user_id: int, *, session: Session) -> Chat | None:
+        query = (
+            select(self.model)
+            .join(self.participant_model)
+            .where(self.model.type == ChatType.PRIVATE)
+            .where(self.participant_model.user_id == user_id)
+            .limit(1)
+        )
+        chat = session.execute(query).scalar_one_or_none()
+        if chat is None:
+            return None
+        return Chat.model_validate(chat, from_attributes=True)
+
+    @session_factory
+    def get_by_id(self, chat_id: int, *, session: Session) -> Chat:
+        query = (
+            select(self.model)
+            .where(self.model.id == chat_id)
+            .limit(1)
+        )
+        chat = session.execute(query).scalar_one_or_none()
+        if chat is None:
+            raise ValueError(f'Chat with id {chat_id} not found')
+        return Chat.model_validate(chat, from_attributes=True)
+
+    @session_factory
+    def find_all(self, user_id: int | None = None, type: ChatType | None = None, *, session: Session) -> list[Chat]:
+        conds = (
+            cond_seq()
+            .and_(self.model.type == type)
+            .and_(self.participant_model.user_id == user_id)
+        )
+        query = (
+            select(self.model)
+            .join(self.participant_model)
+            .where(*conds.clauses)
+            .options(joinedload(self.model.participants))
+        )
+        chat = session.execute(query).unique().scalars().all()
+        return [Chat.model_validate(chat, from_attributes=True) for chat in chat]
 
     @session_factory
     def find_all_by_user_id(self, user_id: int, *, session: Session) -> list[Chat]:

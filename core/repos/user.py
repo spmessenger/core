@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from core.entities.user import User
 from db.models import User as UserModel
@@ -40,7 +41,7 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
             .where(self.model.id == user_id)
             .limit(1)
         )
-        user = session.execute(query).scalar_one()
+        user = session.execute(query).scalar_one_or_none()
         if user is None:
             raise ValueError(f'User with id {user_id} not found')
         return User.model_validate(user, from_attributes=True)
@@ -71,7 +72,10 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
 
     @session_factory
     def save(self, user: User.Creation, *, session: Session) -> User:
-        return super().save(user, session=session)
+        try:
+            return super().save(user, session=session)
+        except IntegrityError:
+            raise ValueError(f'User with username {user.username} already exists')
 
     @session_factory
     def update(self, upd: User.Update, *, session: Session) -> User:

@@ -1,18 +1,26 @@
 from core.entities import Chat, ChatType, Participant
-from core.repos.abc import AbstractChatRepo, AbstractUserRepo, AbstractMessageRepo
+from core.repos.abc import AbstractChatRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
 
 
 class MessengerService:
-    def __init__(self, chat_repo: AbstractChatRepo, message_repo: AbstractMessageRepo, user_repo: AbstractUserRepo):
+    def __init__(
+        self,
+        chat_repo: AbstractChatRepo,
+        participant_repo: AbstractParticipantRepo,
+        message_repo: AbstractMessageRepo,
+        user_repo: AbstractUserRepo
+    ):
         self.chat_repo = chat_repo
+        self.participant_repo = participant_repo
         self.message_repo = message_repo
         self.user_repo = user_repo
 
     def create_private_chat(self, user_id: int) -> tuple[Chat, Participant]:
-        chat = self.chat_repo.find_one(user_id=user_id, type=ChatType.PRIVATE)
-        if chat is not None:
+        if self.chat_repo.find_private_chat(user_id=user_id) is not None:
             raise ValueError('Private chat already exists')
-        return
+        chat = self.chat_repo.save(Chat.PrivateChatCreation())
+        participant = self.participant_repo.save(Participant.Creation(chat_id=chat.id, user_id=user_id))
+        return chat, participant
 
     def send_message(self, chat_id: int, sender_id: int):
         pass

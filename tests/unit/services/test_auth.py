@@ -1,14 +1,11 @@
 import pytest
 from core.services.auth import AuthService
-from core.repos.user import InMemoryUserRepo
-from core.repos.chat import InMemoryChatRepo
-from core.repos.participant import InMemoryParticipantRepo
 from core.entities.chat import ChatType
 from core.misc.utils.hash import hash_password
+from tests.conftest import auth_service as service
 
 
-def test_register():
-    service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
+def test_register(service: AuthService):
     registered_user, private_chat, auth = service.register(username='test', pure_password='test')
 
     assert registered_user.username == 'test'
@@ -19,15 +16,13 @@ def test_register():
     assert private_chat.type == ChatType.PRIVATE
 
 
-def test_double_register():
-    service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
+def test_double_register(service: AuthService):
     service.register(username='test', pure_password='test')
     with pytest.raises(ValueError):
         service.register(username='test', pure_password='test')
 
 
-def test_register_and_login():
-    service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
+def test_register_and_login(service: AuthService):
     registered_user, private_chat, auth = service.register(username='test', pure_password='test')
     assert len(registered_user.refresh_tokens) == 1
 
@@ -37,11 +32,10 @@ def test_register_and_login():
     assert len(login_user.refresh_tokens) == 2
 
 
-def test_refresh_token():
-    service = AuthService(InMemoryUserRepo(), InMemoryChatRepo(), InMemoryParticipantRepo())
+def test_refresh_token(service: AuthService):
     user, _, auth = service.register(username='test', pure_password='test')
 
     service.refresh_token(auth['refresh_token'])
-    user = service.user_repo.find_by_id(user.id)
+    user = service.user_repo.get_by_id(user.id)
 
     assert len(user.refresh_tokens) == 1
