@@ -1,4 +1,5 @@
 from core.entities import Chat, ChatType, Participant, Message
+from core.entities.participant import DEFAULT_PIN_POSITION, PRIVATE_CHAT_PIN_POSITION
 from core.repos.abc import AbstractChatRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
 
 
@@ -36,7 +37,9 @@ class MessengerService:
         if self.chat_repo.find_private_chat(user_id=user_id) is not None:
             raise ValueError('Private chat already exists')
         chat = self.chat_repo.save(Chat.PrivateChatCreation())
-        participant = self.participant_repo.save(Participant.MemberCreation(chat_id=chat.id, user_id=user_id))
+        participant = self.participant_repo.save(Participant.MemberCreation(
+            chat_id=chat.id, user_id=user_id, pin_position=PRIVATE_CHAT_PIN_POSITION
+        ))
         return chat, participant
 
     def send_message(self, chat_id: int, sender_id: int, content: str) -> Message:
@@ -44,3 +47,14 @@ class MessengerService:
         message = self.message_repo.save(Message.Creation(chat_id=chat_id, participant_id=participant.id, content=content))
         self.chat_repo.update_last_message(chat_id, message.id)
         return message
+
+    def pin_chat(self, chat_id: int, user_id: int) -> bool:
+        pin_position = self.participant_repo.get_max_pin_position(user_id) + 1
+        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
+        upd_participant = self.participant_repo.update(Participant.Update(id=participant.id, pin_position=pin_position))
+        return upd_participant.pin_position == pin_position
+
+    def unpin_chat(self, chat_id: int, user_id: int) -> bool:
+        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
+        upd_participant = self.participant_repo.update(Participant.Update(id=participant.id, pin_position=DEFAULT_PIN_POSITION))
+        return upd_participant.pin_position == DEFAULT_PIN_POSITION

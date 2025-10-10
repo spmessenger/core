@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import asc, desc, insert, select, update
+from sqlalchemy import and_, asc, desc, insert, select, update
 from sqlalchemy.orm import aliased, joinedload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from db.models import Chat as ChatModel, Participant as ParticipantModel, Message as MessageModel, chat_last_message_association_table
@@ -83,8 +83,14 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         session.commit()
 
     @session_factory
-    def find_all(self, user_id: int | None = None, type: ChatType | None = None, *, session: Session) -> list[Chat]:
+    def find_all(self, user_id: int | None = None, type: ChatType | None = None, with_user: bool = False, *, session: Session) -> list[Chat]:
+        if user_id is None and with_user is True:
+            raise ValueError('You cannot get chats with user_id=None and with_user=True')
+
+        # AliasedChatParticipants = aliased(self.participant_model)
         AliasedLastMessage = aliased(self.messages_model)
+        ContextParticipant = aliased(self.participant_model)
+
         conds = (
             cond_seq()
             .and_(self.model.type == type)
@@ -92,16 +98,27 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         )
 
         query = (
-            select(self.model)
+            select(self.model, ContextParticipant)
             .join(self.participant_model)
             .where(conds.clause)
             .options(
                 joinedload(self.model.participants),
                 joinedload(self.model.last_message),
+                # joinedload(self.model.participants.of_type(AliasedChatParticipants))
             )
             .outerjoin(self.ass_model, self.ass_model.c.chat_id == self.model.id)
+            # .outerjoin(AliasedChatParticipants, AliasedChatParticipants.chat_id == self.model.id)
             .outerjoin(AliasedLastMessage, self.ass_model.c.message_id == AliasedLastMessage.id)
+            .join(
+                ContextParticipant,
+                and_(
+                    ContextParticipant.chat_id == self.model.id,
+                    ContextParticipant.user_id == user_id
+                )
+            )
             .order_by(
+                asc(ContextParticipant.pin_position == 0),
+                asc(ContextParticipant.pin_position),
                 desc(AliasedLastMessage.created_at_timestamp),
             )
         )

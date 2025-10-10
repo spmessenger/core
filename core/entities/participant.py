@@ -2,6 +2,10 @@ from enum import StrEnum
 from .base import Base
 
 
+DEFAULT_PIN_POSITION = 0
+PRIVATE_CHAT_PIN_POSITION = 1
+
+
 class ParticipantType(StrEnum):
     ADMIN = 'admin'
     MEMBER = 'member'
@@ -13,17 +17,20 @@ class Participant(Base):
     user_id: int
     role: ParticipantType
     draft: str | None = None
-    pinned: bool = False
+    pin_position: int = 0
 
     class Update(Base.Update):
         id: int
         pinned: bool | None = None
         draft: str | None = None
+        pin_position: int | None = None
 
     class Creation(Base.Creation):
         chat_id: int
         user_id: int
         role: ParticipantType
+        draft: str | None = None
+        pin_position: int = 0
 
     class AdminCreation(Creation):
         role: ParticipantType = ParticipantType.ADMIN

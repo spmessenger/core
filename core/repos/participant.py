@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from core.entities.participant import Participant
 from db.models import Participant as ParticipantModel
@@ -22,6 +22,14 @@ class AbstractParticipantRepo(ABC):
         pass
 
     @abstractmethod
+    def get_max_pin_position(self, user_id: int) -> int:
+        pass
+
+    @abstractmethod
+    def update(self, participant: Participant.Update) -> Participant:
+        pass
+
+    @abstractmethod
     def save(self, participant: Participant.Creation) -> Participant:
         pass
 
@@ -29,6 +37,14 @@ class AbstractParticipantRepo(ABC):
 class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
     model = ParticipantModel
     entity_model = Participant
+
+    @session_factory
+    def get_max_pin_position(self, user_id: int, *, session: Session) -> int:
+        query = (
+            select(func.max(self.model.pin_position))
+            .where(self.model.user_id == user_id)
+        )
+        return (session.execute(query)).scalar_one() or 0
 
     @session_factory
     def get_one(self, id: int | None = None, chat_id: int | None = None, user_id: int | None = None, *, session: Session) -> Participant:
@@ -77,6 +93,10 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         )
         participants = session.execute(query).unique().scalars().all()
         return [Participant.model_validate(participant, from_attributes=True) for participant in participants]
+
+    @session_factory
+    def update(self, participant: Participant.Update, *, session: Session) -> Participant:
+        return super().update(participant, session=session)
 
     @session_factory
     def save(self, participant: Participant.Creation, *, session: Session) -> Participant:

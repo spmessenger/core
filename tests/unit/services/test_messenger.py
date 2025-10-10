@@ -22,7 +22,7 @@ def test_send_message(messenger: MessengerService):
     assert message.content == 'test'
 
 
-def test_pin_chat(messenger_service: MessengerService):
+def test_pin_unpin_chat(messenger_service: MessengerService):
     user_id = 1
     participant_id = 2
 
@@ -34,14 +34,22 @@ def test_pin_chat(messenger_service: MessengerService):
     assert chats[0].title == 'test'
     assert chats[1].title == 'test1'
 
-    messenger_service.pin_chat(chats[1].id, user_id)
+    pinned = messenger_service.pin_chat(chats[1].id, user_id)
+    assert pinned is True
 
     chats = messenger_service.chat_repo.find_all(user_id=user_id)
     assert chats[0].title == 'test1'
     assert chats[1].title == 'test'
 
+    unpinned = messenger_service.unpin_chat(chats[0].id, user_id)
+    assert unpinned is True
 
-def test_chat_shuffle(messenger_service: MessengerService):
+    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+    assert chats[0].title == 'test'
+    assert chats[1].title == 'test1'
+
+
+def test_chat_shuffle_001(messenger_service: MessengerService):
     user_id = 1
     participant_id = 2
 
