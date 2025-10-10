@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from sqlalchemy import and_, asc, desc, insert, select, update
 from sqlalchemy.orm import aliased, joinedload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from db.models import Chat as ChatModel, Participant as ParticipantModel, Message as MessageModel, chat_last_message_association_table
+from db.models import Chat as ChatModel, Participant as ParticipantModel, Message as MessageModel, User as UserModel, chat_last_message_association_table
 from db.session import session_factory, Session
 from db.misc.cond import cond_seq
 
@@ -14,6 +14,10 @@ from .participant import InMemoryParticipantRepo
 class AbstractChatRepo(ABC):
     @abstractmethod
     def get_by_id(self, chat_id: int) -> Chat:
+        pass
+
+    @abstractmethod
+    def find_dialog(self, user_id: int, participant_id: int) -> Chat | None:
         pass
 
     @abstractmethod
@@ -42,6 +46,7 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
     messages_model = MessageModel
     participant_model = ParticipantModel
     ass_model = chat_last_message_association_table
+    user_model = UserModel
     entity_model = Chat
 
     @session_factory
@@ -83,13 +88,37 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         session.commit()
 
     @session_factory
+    def find_dialog(self, user_id: int, participant_id: int, *, session: Session) -> Chat | None:
+        # Create aliases for the two participants we're looking for
+        UserParticipant = aliased(self.participant_model)
+        OtherParticipant = aliased(self.participant_model)
+
+        # Find dialogs that have both the current user AND the other participant
+        query = (
+            select(self.model)
+            .join(UserParticipant, UserParticipant.chat_id == self.model.id)
+            .join(OtherParticipant, OtherParticipant.chat_id == self.model.id)
+            .where(
+                self.model.type == ChatType.DIALOG,
+                UserParticipant.user_id == user_id,
+                OtherParticipant.user_id == participant_id
+            )
+        )
+
+        chat = session.execute(query).scalar_one_or_none()
+        if chat is None:
+            return None
+        return Chat.model_validate(chat, from_attributes=True)
+
+    @session_factory
     def find_all(self, user_id: int | None = None, type: ChatType | None = None, with_user: bool = False, *, session: Session) -> list[Chat]:
         # if user_id is None and with_user is True:
         #     raise ValueError('You cannot get chats with user_id=None and with_user=True')
 
-        # AliasedChatParticipants = aliased(self.participant_model)
+        AliasedChatParticipants = aliased(self.participant_model)
         AliasedLastMessage = aliased(self.messages_model)
         ContextParticipant = aliased(self.participant_model)
+        AliasedUser = aliased(self.user_model)
 
         conds = (
             cond_seq()
@@ -106,8 +135,9 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
             .join(self.participant_model)
             .where(conds.clause)
             .options(
-                joinedload(self.model.participants),
                 joinedload(self.model.last_message),
+                joinedload(self.model.participants.of_type(AliasedChatParticipants)).joinedload(
+                    AliasedChatParticipants.user.of_type(AliasedUser)),
             )
             .outerjoin(self.ass_model, self.ass_model.c.chat_id == self.model.id)
             .outerjoin(AliasedLastMessage, self.ass_model.c.message_id == AliasedLastMessage.id)
@@ -130,8 +160,12 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
                     asc(ContextParticipant.pin_position),
                 )
             )
-        chat = session.execute(query).unique().scalars().all()
-        return [Chat.model_validate(chat, from_attributes=True) for chat in chat]
+        chats = session.execute(query).unique().scalars().all()
+        # for chat in chats:
+        #     if chat.type != ChatType.DIALOG:
+        #         continue
+        #     chat.title = list(filter(lambda p: p.user_id != user_id, chat.participants)).pop().user.username
+        return [Chat.model_validate(chat, from_attributes=True) for chat in chats]
 
     @session_factory
     def find_all_by_user_id(self, user_id: int, *, session: Session) -> list[Chat]:

@@ -11,7 +11,7 @@ def test_create_private_chat(messenger: MessengerService):
     assert participant.user_id == 1
 
 
-def test_create_dialog(messenger: MessengerService):
+def test_create_dialog_001(messenger: MessengerService):
     user_id = 1
     user_id2 = 2
     messenger.create_dialog(user_id, user_id2)
@@ -23,6 +23,34 @@ def test_create_dialog(messenger: MessengerService):
 
     chats = messenger.chat_repo.find_all(user_id=user_id2)
     assert len(chats) == 0
+
+
+def test_create_dialog_002(messenger: MessengerService):
+    user_id = 1
+    user_id2 = 2
+    messenger.create_dialog(user_id, user_id2)
+    messenger.create_dialog(user_id2, user_id)
+
+    chats = messenger.chat_repo.find_all(user_id=user_id)
+
+    assert len(chats) == 1
+    assert chats[0].type == ChatType.DIALOG
+
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert len(chats) == 1
+
+
+def test_send_message_to_dialog(messenger: MessengerService):
+    user_id = 1
+    user_id2 = 2
+    chat, _ = messenger.create_dialog(user_id, user_id2)
+
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert len(chats) == 0
+    messenger.send_message(chat.id, user_id, 'test')
+
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert len(chats) == 1
 
 
 def test_send_message(messenger: MessengerService):

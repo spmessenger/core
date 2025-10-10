@@ -18,12 +18,14 @@ class Participant(Base):
     role: ParticipantType
     draft: str | None = None
     pin_position: int = 0
+    chat_visible: bool = True
 
     class Update(Base.Update):
         id: int
         pinned: bool | None = None
         draft: str | None = None
         pin_position: int | None = None
+        chat_visible: bool | None = None
 
     class Creation(Base.Creation):
         chat_id: int
