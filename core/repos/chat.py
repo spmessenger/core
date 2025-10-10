@@ -95,34 +95,41 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
             cond_seq()
             .and_(self.model.type == type)
             .and_(self.participant_model.user_id == user_id)
-            .and_(ContextParticipant.chat_visible == True)
         )
 
+        if user_id is not None:
+            conds.and_(self.participant_model.user_id == user_id).and_(ContextParticipant.chat_visible == True)
+
+        models = (self.model, ContextParticipant) if user_id is not None else (self.model,)
         query = (
-            select(self.model, ContextParticipant)
+            select(*models)
             .join(self.participant_model)
             .where(conds.clause)
             .options(
                 joinedload(self.model.participants),
                 joinedload(self.model.last_message),
-                # joinedload(self.model.participants.of_type(AliasedChatParticipants))
             )
             .outerjoin(self.ass_model, self.ass_model.c.chat_id == self.model.id)
-            # .outerjoin(AliasedChatParticipants, AliasedChatParticipants.chat_id == self.model.id)
             .outerjoin(AliasedLastMessage, self.ass_model.c.message_id == AliasedLastMessage.id)
-            .join(
-                ContextParticipant,
-                and_(
-                    ContextParticipant.chat_id == self.model.id,
-                    ContextParticipant.user_id == user_id
-                )
-            )
             .order_by(
-                asc(ContextParticipant.pin_position == 0),
-                asc(ContextParticipant.pin_position),
                 desc(AliasedLastMessage.created_at_timestamp),
             )
         )
+        if user_id is not None:
+            query = (
+                query
+                .join(
+                    ContextParticipant,
+                    and_(
+                        ContextParticipant.chat_id == self.model.id,
+                        ContextParticipant.user_id == user_id
+                    )
+                )
+                .order_by(
+                    asc(ContextParticipant.pin_position == 0),
+                    asc(ContextParticipant.pin_position),
+                )
+            )
         chat = session.execute(query).unique().scalars().all()
         return [Chat.model_validate(chat, from_attributes=True) for chat in chat]
 

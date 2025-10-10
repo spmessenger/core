@@ -16,10 +16,13 @@ def test_create_dialog(messenger: MessengerService):
     user_id2 = 2
     messenger.create_dialog(user_id, user_id2)
 
-    chats = messenger.chat_repo.find_all()
+    chats = messenger.chat_repo.find_all(user_id=user_id)
 
     assert len(chats) == 1
     assert chats[0].type == ChatType.DIALOG
+
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert len(chats) == 0
 
 
 def test_send_message(messenger: MessengerService):
