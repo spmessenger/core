@@ -16,6 +16,14 @@ class MessengerService:
         self.message_repo = message_repo
         self.user_repo = user_repo
 
+    def create_dialog(self, user_id: int, participant_id: int) -> tuple[Chat, list[Participant]]:
+        chat = self.chat_repo.save(Chat.DialogCreation())
+        participants = [
+            self.participant_repo.save(Participant.MemberCreation(chat_id=chat.id, user_id=participant_id)),
+            self.participant_repo.save(Participant.MemberCreation(chat_id=chat.id, user_id=participant_id, chat_visible=False)),
+        ]
+        return chat, participants
+
     def create_group_chat(self, user_id: int, title: str, participants: list[int]) -> tuple[Chat, list[Participant]]:
         participants = list(filter(lambda p: p != user_id, participants))
 

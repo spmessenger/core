@@ -84,8 +84,8 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
 
     @session_factory
     def find_all(self, user_id: int | None = None, type: ChatType | None = None, with_user: bool = False, *, session: Session) -> list[Chat]:
-        if user_id is None and with_user is True:
-            raise ValueError('You cannot get chats with user_id=None and with_user=True')
+        # if user_id is None and with_user is True:
+        #     raise ValueError('You cannot get chats with user_id=None and with_user=True')
 
         # AliasedChatParticipants = aliased(self.participant_model)
         AliasedLastMessage = aliased(self.messages_model)
@@ -95,6 +95,7 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
             cond_seq()
             .and_(self.model.type == type)
             .and_(self.participant_model.user_id == user_id)
+            .and_(ContextParticipant.chat_visible == True)
         )
 
         query = (

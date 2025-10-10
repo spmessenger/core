@@ -31,6 +31,7 @@ class Participant(Base):
         role: ParticipantType
         draft: str | None = None
         pin_position: int = 0
+        chat_visible: bool = True
 
     class AdminCreation(Creation):
         role: ParticipantType = ParticipantType.ADMIN
