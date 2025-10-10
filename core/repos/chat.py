@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import select
-from sqlalchemy.orm import joinedload
-from db.models import Chat as ChatModel, Participant as ParticipantModel
+from sqlalchemy import asc, desc, insert, select, update
+from sqlalchemy.orm import aliased, joinedload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from db.models import Chat as ChatModel, Participant as ParticipantModel, Message as MessageModel, chat_last_message_association_table
 from db.session import session_factory, Session
 from db.misc.cond import cond_seq
 
@@ -20,11 +21,15 @@ class AbstractChatRepo(ABC):
         pass
 
     @abstractmethod
-    def find_all(self, user_id: int | None = None, type: ChatType | None = None) -> Chat | None:
+    def find_all(self, user_id: int | None = None, type: ChatType | None = None) -> list[Chat]:
         pass
 
     @abstractmethod
     def find_all_by_user_id(self, user_id: int) -> list[Chat]:
+        pass
+
+    @abstractmethod
+    def update_last_message(self, chat_id: int, message_id: int):
         pass
 
     @abstractmethod
@@ -34,7 +39,9 @@ class AbstractChatRepo(ABC):
 
 class DbChatRepo(DbRepo, AbstractChatRepo):
     model = ChatModel
+    messages_model = MessageModel
     participant_model = ParticipantModel
+    ass_model = chat_last_message_association_table
     entity_model = Chat
 
     @session_factory
@@ -62,17 +69,41 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         return Chat.model_validate(chat, from_attributes=True)
 
     @session_factory
+    def update_last_message(self, chat_id: int, message_id: int, *, session: Session):
+        query = (
+            pg_insert(self.ass_model)
+            .values({'chat_id': chat_id, 'message_id': message_id})
+            .on_conflict_do_update(
+                index_elements=[self.ass_model.c.chat_id],
+                set_={'message_id': message_id},
+            )
+            .returning(self.ass_model)
+        )
+        session.execute(query)
+        session.commit()
+
+    @session_factory
     def find_all(self, user_id: int | None = None, type: ChatType | None = None, *, session: Session) -> list[Chat]:
+        AliasedLastMessage = aliased(self.messages_model)
         conds = (
             cond_seq()
             .and_(self.model.type == type)
             .and_(self.participant_model.user_id == user_id)
         )
+
         query = (
             select(self.model)
             .join(self.participant_model)
-            .where(*conds.clauses)
-            .options(joinedload(self.model.participants))
+            .where(conds.clause)
+            .options(
+                joinedload(self.model.participants),
+                joinedload(self.model.last_message),
+            )
+            .outerjoin(self.ass_model, self.ass_model.c.chat_id == self.model.id)
+            .outerjoin(AliasedLastMessage, self.ass_model.c.message_id == AliasedLastMessage.id)
+            .order_by(
+                desc(AliasedLastMessage.created_at_timestamp),
+            )
         )
         chat = session.execute(query).unique().scalars().all()
         return [Chat.model_validate(chat, from_attributes=True) for chat in chat]

@@ -20,3 +20,49 @@ def test_send_message(messenger: MessengerService):
     assert message.chat_id == chat.id
     assert message.participant_id == participant.id
     assert message.content == 'test'
+
+
+def test_pin_chat(messenger_service: MessengerService):
+    user_id = 1
+    participant_id = 2
+
+    messenger_service.create_group_chat(user_id, title='test', participants=[participant_id])
+    messenger_service.create_group_chat(user_id, title='test1', participants=[participant_id])
+
+    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+
+    assert chats[0].title == 'test'
+    assert chats[1].title == 'test1'
+
+    messenger_service.pin_chat(chats[1].id, user_id)
+
+    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+    assert chats[0].title == 'test1'
+    assert chats[1].title == 'test'
+
+
+def test_chat_shuffle(messenger_service: MessengerService):
+    user_id = 1
+    participant_id = 2
+
+    messenger_service.create_group_chat(user_id, title='test', participants=[participant_id])
+    messenger_service.create_group_chat(user_id, title='test1', participants=[participant_id])
+
+    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+
+    assert chats[0].title == 'test'
+    assert chats[1].title == 'test1'
+
+    messenger_service.send_message(chats[1].id, user_id, 'test')
+
+    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+
+    assert chats[0].title == 'test1'
+    assert chats[1].title == 'test'
+
+    messenger_service.send_message(chats[1].id, user_id, 'test')
+
+    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+
+    assert chats[0].title == 'test'
+    assert chats[1].title == 'test1'

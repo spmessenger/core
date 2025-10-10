@@ -17,5 +17,8 @@ class Chat(Base):
         type: ChatType
         title: str | None = None
 
+    class GroupChatCreation(Creation):
+        type: ChatType = ChatType.GROUP
+
     class PrivateChatCreation(Creation):
         type: ChatType = ChatType.PRIVATE

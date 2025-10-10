@@ -10,6 +10,7 @@ class Message(Base):
     chat_id: int
     participant_id: int
     content: str
+    created_at_timestamp: float
 
     class Creation(Base.Creation):
         chat_id: int
