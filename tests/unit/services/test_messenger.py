@@ -11,6 +11,27 @@ def test_create_private_chat(messenger: MessengerService):
     assert participant.user_id == 1
 
 
+def test_find_dialog(messenger: MessengerService):
+    user_id = 1
+    user_id2 = 2
+    user_id3 = 3
+
+    chat, *_ = messenger.create_dialog(user_id, user_id2)
+    chat1, *_ = messenger.create_dialog(user_id, user_id3)
+
+    dialog = messenger.chat_repo.find_dialog(user_id=user_id, participant_id=user_id2)
+    dialog1 = messenger.chat_repo.find_dialog(user_id=user_id, participant_id=user_id3)
+
+    assert dialog.id == chat.id
+    assert dialog1.id == chat1.id
+
+    dialog = messenger.chat_repo.find_dialog(user_id=user_id2, participant_id=user_id)
+    dialog1 = messenger.chat_repo.find_dialog(user_id=user_id3, participant_id=user_id)
+
+    assert dialog.id == chat.id
+    assert dialog1.id == chat1.id
+
+
 def test_create_dialog_001(messenger: MessengerService):
     user_id = 1
     user_id2 = 2

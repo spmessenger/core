@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from core.entities.participant import Participant
 from db.models import Participant as ParticipantModel
@@ -27,6 +27,10 @@ class AbstractParticipantRepo(ABC):
 
     @abstractmethod
     def update(self, participant: Participant.Update) -> Participant:
+        pass
+
+    @abstractmethod
+    def update_chat_visible_to_all(self, chat_id: int, visible: bool) -> None:
         pass
 
     @abstractmethod
@@ -97,6 +101,16 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
     @session_factory
     def update(self, participant: Participant.Update, *, session: Session) -> Participant:
         return super().update(participant, session=session)
+
+    @session_factory
+    def update_chat_visible_to_all(self, chat_id: int, visible: bool, *, session: Session) -> None:
+        query = (
+            update(self.model)
+            .values(chat_visible=visible)
+            .where(self.model.chat_id == chat_id)
+        )
+        session.execute(query)
+        session.commit()
 
     @session_factory
     def save(self, participant: Participant.Creation, *, session: Session) -> Participant:

@@ -20,14 +20,15 @@ class MessengerService:
         if user_id == participant_id:
             raise ValueError('You cannot create dialog with user_id=participant_id')
         dialog = self.chat_repo.find_dialog(user_id=user_id, participant_id=participant_id)
-        if dialog is not None:
-            dialog_participants = self.participant_repo.find_all(chat_id=dialog.id)
-            if all(p.chat_visible for p in dialog_participants):
-                raise ValueError('You cannot create dialog with all participants visible')
-            participants = [
-                p if p.chat_visible else self.participant_repo.update(Participant.Update(id=p.id, chat_visible=True))
-                for p in dialog_participants
-            ]
+        # if dialog is not None:
+        #     dialog_participants = self.participant_repo.find_all(chat_id=dialog.id)
+        #     if all(p.chat_visible for p in dialog_participants):
+        #         raise ValueError('You cannot create dialog with all participants visible')
+        #     participants = [
+        #         p if p.chat_visible else self.participant_repo.update(Participant.Update(id=p.id, chat_visible=True))
+        #         for p in dialog_participants
+        #     ]
+        #     return dialog, participants
 
         chat = self.chat_repo.save(Chat.DialogCreation())
         participants = [
@@ -66,6 +67,7 @@ class MessengerService:
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=sender_id)
         message = self.message_repo.save(Message.Creation(chat_id=chat_id, participant_id=participant.id, content=content))
         self.chat_repo.update_last_message(chat_id, message.id)
+        self.post_message(message)
         return message
 
     def pin_chat(self, chat_id: int, user_id: int) -> bool:
@@ -78,3 +80,8 @@ class MessengerService:
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
         upd_participant = self.participant_repo.update(Participant.Update(id=participant.id, pin_position=DEFAULT_PIN_POSITION))
         return upd_participant.pin_position == DEFAULT_PIN_POSITION
+
+    def post_message(self, message: Message) -> None:
+        chat = self.chat_repo.get_by_id(message.chat_id)
+        if chat.type == ChatType.DIALOG:
+            self.participant_repo.update_chat_visible_to_all(chat_id=chat.id, visible=True)
