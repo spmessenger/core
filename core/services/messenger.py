@@ -20,15 +20,8 @@ class MessengerService:
         if user_id == participant_id:
             raise ValueError('You cannot create dialog with user_id=participant_id')
         dialog = self.chat_repo.find_dialog(user_id=user_id, participant_id=participant_id)
-        # if dialog is not None:
-        #     dialog_participants = self.participant_repo.find_all(chat_id=dialog.id)
-        #     if all(p.chat_visible for p in dialog_participants):
-        #         raise ValueError('You cannot create dialog with all participants visible')
-        #     participants = [
-        #         p if p.chat_visible else self.participant_repo.update(Participant.Update(id=p.id, chat_visible=True))
-        #         for p in dialog_participants
-        #     ]
-        #     return dialog, participants
+        if dialog is not None:
+            return dialog, self.participant_repo.update_chat_visible_to_all(chat_id=dialog.id, visible=True)
 
         chat = self.chat_repo.save(Chat.DialogCreation())
         participants = [

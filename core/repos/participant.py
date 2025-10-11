@@ -30,7 +30,7 @@ class AbstractParticipantRepo(ABC):
         pass
 
     @abstractmethod
-    def update_chat_visible_to_all(self, chat_id: int, visible: bool) -> None:
+    def update_chat_visible_to_all(self, chat_id: int, visible: bool) -> list[Participant]:
         pass
 
     @abstractmethod
@@ -103,14 +103,17 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         return super().update(participant, session=session)
 
     @session_factory
-    def update_chat_visible_to_all(self, chat_id: int, visible: bool, *, session: Session) -> None:
+    def update_chat_visible_to_all(self, chat_id: int, visible: bool, *, session: Session) -> list[Participant]:
         query = (
             update(self.model)
             .values(chat_visible=visible)
             .where(self.model.chat_id == chat_id)
+            .returning(self.model)
         )
-        session.execute(query)
+        result = session.execute(query).scalars()
+        paritcipants = [Participant.model_validate(participant, from_attributes=True) for participant in result]
         session.commit()
+        return paritcipants
 
     @session_factory
     def save(self, participant: Participant.Creation, *, session: Session) -> Participant:
