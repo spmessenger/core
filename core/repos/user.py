@@ -51,7 +51,7 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
             select(self.model)
             .where(self.model.id == user_id)
         )
-        user = session.execute(query).scalar_one()
+        user = session.execute(query).scalar_one_or_none()
         if user is None:
             return None
         return User.model_validate(user, from_attributes=True)
@@ -62,7 +62,7 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
             select(self.model)
             .where(self.model.username == username)
         )
-        user = session.execute(query).scalar_one()
+        user = session.execute(query).scalar_one_or_none()
         if user is None:
             return None
         return User.model_validate(user, from_attributes=True)
