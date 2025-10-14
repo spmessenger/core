@@ -50,7 +50,13 @@ class AuthService:
         return auth
 
     def get_auth(self, user_id: int) -> dict:
+        access_token = self.jwt_token_manager.create_access_token({'id': user_id})
+        refresh_token = self.jwt_token_manager.create_refresh_token({'id': user_id})
+        access_token_expiration = self.jwt_token_manager.get_payload(access_token)['exp']
+        refresh_token_expiration = self.jwt_token_manager.get_payload(refresh_token)['exp']
         return {
-            'access_token': self.jwt_token_manager.create_access_token({'id': user_id}),
-            'refresh_token': self.jwt_token_manager.create_refresh_token({'id': user_id})
+            'access_token': access_token,
+            'refresh_token': refresh_token,
+            'acess_token_expiration': access_token_expiration,
+            'refresh_token_expiration': refresh_token_expiration,
         }

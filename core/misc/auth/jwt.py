@@ -19,6 +19,9 @@ class JWTTokenManager:
         self.refresh_token_expire_days = refresh_token_expire_days
         self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+    def get_payload(self, token: str) -> dict:
+        return jose_jwt.get_unverified_claims(token)
+
     def create_access_token(
         self,
         data: Dict[str, Any],
