@@ -43,6 +43,8 @@ class AuthService:
             raise ValueError('Invalid refresh token')
         user_id = payload['id']
         user = self.user_repo.get_by_id(user_id)
+        if refresh_token not in user.refresh_tokens:
+            raise ValueError('Refresh token not found')
 
         auth = self.get_auth(user.id)
         user.refresh_tokens.remove(refresh_token)
