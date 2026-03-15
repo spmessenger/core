@@ -13,10 +13,12 @@ class Chat(Base):
     id: int
     type: ChatType
     title: str | None = None
+    avatar_url: str | None = None
 
     class Creation(Base.Creation):
         type: ChatType
         title: str | None = None
+        avatar_url: str | None = None
 
     class DialogCreation(Creation):
         type: ChatType = ChatType.DIALOG

@@ -193,5 +193,6 @@ class InMemoryChatRepo(AbstractChatRepo, InMemoryRepo[Chat]):
             id=0,
             title=chat.title,
             type=chat.type,
+            avatar_url=chat.avatar_url,
         )
         return self._save(entity)

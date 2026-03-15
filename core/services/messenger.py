@@ -30,10 +30,16 @@ class MessengerService:
         ]
         return chat, participants
 
-    def create_group_chat(self, user_id: int, title: str, participants: list[int]) -> tuple[Chat, list[Participant]]:
+    def create_group_chat(
+        self,
+        user_id: int,
+        title: str,
+        participants: list[int],
+        avatar_url: str | None = None,
+    ) -> tuple[Chat, list[Participant]]:
         participants = list(filter(lambda p: p != user_id, participants))
 
-        chat = self.chat_repo.save(Chat.GroupChatCreation(title=title))
+        chat = self.chat_repo.save(Chat.GroupChatCreation(title=title, avatar_url=avatar_url))
         chat_participants = [
             self.participant_repo.save(
                 Participant.MemberCreation(chat_id=chat.id, user_id=participant_id)
