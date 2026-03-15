@@ -10,6 +10,10 @@ from .base import InMemoryRepo, DbRepo
 
 class AbstractUserRepo(ABC):
     @abstractmethod
+    def find_all(self) -> list[User]:
+        pass
+
+    @abstractmethod
     def get_by_id(self, user_id: int) -> User:
         pass
 
@@ -33,6 +37,12 @@ class AbstractUserRepo(ABC):
 class DbUserRepo(DbRepo, AbstractUserRepo):
     model = UserModel
     entity_model = User
+
+    @session_factory
+    def find_all(self, *, session: Session) -> list[User]:
+        query = select(self.model)
+        users = session.execute(query).scalars().all()
+        return [User.model_validate(user, from_attributes=True) for user in users]
 
     @session_factory
     def get_by_id(self, user_id: int, *, session: Session) -> User:
@@ -82,6 +92,9 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
 class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
     _storage: list[User] = []
     _last_id: int = 0
+
+    def find_all(self) -> list[User]:
+        return list(self._storage)
 
     def get_by_id(self, user_id: int) -> User:
         for user in self._storage:
