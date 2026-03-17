@@ -51,6 +51,17 @@ class AuthService:
         self.user_repo.update(User.Update(id=user.id, refresh_tokens=[*user.refresh_tokens, auth['refresh_token']]))
         return auth
 
+    def update_profile(self, user_id: int, username: str) -> User:
+        normalized_username = username.strip()
+        if not normalized_username:
+            raise ValueError('Username cannot be empty')
+
+        user = self.user_repo.get_by_id(user_id)
+        if user.username == normalized_username:
+            return user
+
+        return self.user_repo.update(User.Update(id=user.id, username=normalized_username))
+
     def get_auth(self, user_id: int) -> dict:
         access_token = self.jwt_token_manager.create_access_token({'id': user_id})
         refresh_token = self.jwt_token_manager.create_refresh_token({'id': user_id})

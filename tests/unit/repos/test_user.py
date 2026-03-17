@@ -39,3 +39,12 @@ def test_get_in_memory_not_found():
     repo = InMemoryUserRepo()
     with pytest.raises(ValueError):
         repo.get_by_id(1)
+
+
+def test_update_in_memory_rejects_duplicate_username():
+    repo = InMemoryUserRepo()
+    first_user = repo.save(User.Creation(username='test', hashed_password='test'))
+    repo.save(User.Creation(username='test2', hashed_password='test'))
+
+    with pytest.raises(ValueError, match='already exists'):
+        repo.update(User.Update(id=first_user.id, username='test2'))

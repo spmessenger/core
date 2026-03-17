@@ -39,3 +39,18 @@ def test_refresh_token(service: AuthService):
     user = service.user_repo.get_by_id(user.id)
 
     assert len(user.refresh_tokens) == 1
+
+
+def test_update_profile(service: AuthService):
+    user, _, _ = service.register(username='test', pure_password='test')
+
+    updated_user = service.update_profile(user.id, 'updated')
+
+    assert updated_user.username == 'updated'
+
+
+def test_update_profile_rejects_blank_username(service: AuthService):
+    user, _, _ = service.register(username='test', pure_password='test')
+
+    with pytest.raises(ValueError, match='Username cannot be empty'):
+        service.update_profile(user.id, '   ')

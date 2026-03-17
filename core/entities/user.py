@@ -20,4 +20,4 @@ class User(Base):
         id: int
         username: str | None = None
         hashed_password: str | None = None
-        refresh_tokens: list[str] | None
+        refresh_tokens: list[str] | None = None

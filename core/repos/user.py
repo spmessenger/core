@@ -86,7 +86,10 @@ class DbUserRepo(DbRepo, AbstractUserRepo):
 
     @session_factory
     def update(self, upd: User.Update, *, session: Session) -> User:
-        return super().update(upd, session=session)
+        try:
+            return super().update(upd, session=session)
+        except IntegrityError:
+            raise ValueError(f'User with username {upd.username} already exists')
 
 
 class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
@@ -115,6 +118,10 @@ class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
         return None
 
     def update(self, upd: User.Update) -> User:
+        if upd.username is not None:
+            existing_user = self.find_one_by_username(upd.username)
+            if existing_user is not None and existing_user.id != upd.id:
+                raise ValueError(f'User with username {upd.username} already exists')
         updted_entity = self._update(upd)
         return User.model_validate(updted_entity, from_attributes=True)
 

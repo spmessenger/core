@@ -20,7 +20,7 @@ python-multipart = "^0.0.20"
 types-python-jose = "^3.5.0.20250531"
 types-passlib = "^1.7.7.20250602"
 pydantic-settings = "^2.11.0"
-db = { git = "https://github.com/spmessenger/db.git", branch = "main" }
+db = { path = "../db", develop = true }
 
 
 
