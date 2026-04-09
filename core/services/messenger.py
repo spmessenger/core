@@ -16,6 +16,17 @@ class MessengerService:
         self.message_repo = message_repo
         self.user_repo = user_repo
 
+    def get_chat_participant(self, chat_id: int, user_id: int) -> Participant:
+        return self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
+
+    def get_chat_participants(self, chat_id: int) -> list[Participant]:
+        return self.participant_repo.find_all(chat_id=chat_id)
+
+    def get_chat_messages(self, chat_id: int, user_id: int) -> tuple[Participant, list[Message]]:
+        participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
+        messages = self.message_repo.find_all(chat_id=chat_id)
+        return participant, messages
+
     def create_dialog(self, user_id: int, participant_id: int) -> tuple[Chat, list[Participant]]:
         if user_id == participant_id:
             raise ValueError('You cannot create dialog with user_id=participant_id')

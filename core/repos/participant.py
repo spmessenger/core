@@ -93,7 +93,7 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         )
         query = (
             select(self.model)
-            .where(*conds.clauses)
+            .where(conds.clause)
         )
         participants = session.execute(query).unique().scalars().all()
         return [Participant.model_validate(participant, from_attributes=True) for participant in participants]
