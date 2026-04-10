@@ -14,6 +14,10 @@ class Chat(Base):
     type: ChatType
     title: str | None = None
     avatar_url: str | None = None
+    last_message: str | None = None
+    last_message_at: str | None = None
+    unread_messages_count: int = 0
+    pin_position: int = 0
 
     class Creation(Base.Creation):
         type: ChatType

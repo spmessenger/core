@@ -34,6 +34,10 @@ class AbstractParticipantRepo(ABC):
         pass
 
     @abstractmethod
+    def update_last_read_message(self, chat_id: int, user_id: int, last_read_message_id: int | None) -> Participant:
+        pass
+
+    @abstractmethod
     def save(self, participant: Participant.Creation) -> Participant:
         pass
 
@@ -116,6 +120,30 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         return paritcipants
 
     @session_factory
+    def update_last_read_message(
+        self,
+        chat_id: int,
+        user_id: int,
+        last_read_message_id: int | None,
+        *,
+        session: Session,
+    ) -> Participant:
+        query = (
+            update(self.model)
+            .values(last_read_message_id=last_read_message_id)
+            .where(self.model.chat_id == chat_id)
+            .where(self.model.user_id == user_id)
+            .returning(self.model)
+        )
+        participant = session.execute(query).scalar_one_or_none()
+        if participant is None:
+            raise ValueError(
+                f'Participant with chat_id={chat_id} and user_id={user_id} not found'
+            )
+        session.commit()
+        return Participant.model_validate(participant, from_attributes=True)
+
+    @session_factory
     def save(self, participant: Participant.Creation, *, session: Session) -> Participant:
         return super().save(participant, session=session)
 
@@ -129,5 +157,23 @@ class InMemoryParticipantRepo(AbstractParticipantRepo, InMemoryRepo[Participant]
             id=0,
             chat_id=participant.chat_id,
             user_id=participant.user_id,
+            role=participant.role,
+            draft=participant.draft,
+            pin_position=participant.pin_position,
+            chat_visible=participant.chat_visible,
+            last_read_message_id=participant.last_read_message_id,
         )
         return self._save(entity)
+
+    def update_last_read_message(
+        self,
+        chat_id: int,
+        user_id: int,
+        last_read_message_id: int | None,
+    ) -> Participant:
+        participant = self.get_one(chat_id=chat_id, user_id=user_id)
+        updated = Participant.Update(
+            id=participant.id,
+            last_read_message_id=last_read_message_id,
+        )
+        return self.update(updated)

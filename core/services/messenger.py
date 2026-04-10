@@ -1,6 +1,7 @@
 from core.entities import Chat, ChatType, Participant, Message
+from core.entities.chat_group import ChatGroup
 from core.entities.participant import DEFAULT_PIN_POSITION, PRIVATE_CHAT_PIN_POSITION
-from core.repos.abc import AbstractChatRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
+from core.repos.abc import AbstractChatRepo, AbstractChatGroupRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
 
 
 class MessengerService:
@@ -9,12 +10,19 @@ class MessengerService:
         chat_repo: AbstractChatRepo,
         participant_repo: AbstractParticipantRepo,
         message_repo: AbstractMessageRepo,
-        user_repo: AbstractUserRepo
+        user_repo: AbstractUserRepo,
+        chat_group_repo: AbstractChatGroupRepo | None = None,
     ):
         self.chat_repo = chat_repo
         self.participant_repo = participant_repo
         self.message_repo = message_repo
         self.user_repo = user_repo
+        self.chat_group_repo = chat_group_repo
+
+    def _ensure_chat_group_repo(self) -> AbstractChatGroupRepo:
+        if self.chat_group_repo is None:
+            raise ValueError('Chat group repository is not configured')
+        return self.chat_group_repo
 
     def get_chat_participant(self, chat_id: int, user_id: int) -> Participant:
         return self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
@@ -25,7 +33,34 @@ class MessengerService:
     def get_chat_messages(self, chat_id: int, user_id: int) -> tuple[Participant, list[Message]]:
         participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
         messages = self.message_repo.find_all(chat_id=chat_id)
+        if messages:
+            participant = self.participant_repo.update_last_read_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                last_read_message_id=messages[-1].id,
+            )
         return participant, messages
+
+    def get_chat_messages_page(
+        self,
+        chat_id: int,
+        user_id: int,
+        before_message_id: int | None = None,
+        limit: int = 50,
+    ) -> tuple[Participant, list[Message], bool]:
+        participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
+        messages, has_more = self.message_repo.find_page(
+            chat_id=chat_id,
+            before_message_id=before_message_id,
+            limit=limit,
+        )
+        if before_message_id is None and messages:
+            participant = self.participant_repo.update_last_read_message(
+                chat_id=chat_id,
+                user_id=user_id,
+                last_read_message_id=messages[-1].id,
+            )
+        return participant, messages, has_more
 
     def create_dialog(self, user_id: int, participant_id: int) -> tuple[Chat, list[Participant]]:
         if user_id == participant_id:
@@ -90,6 +125,29 @@ class MessengerService:
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
         upd_participant = self.participant_repo.update(Participant.Update(id=participant.id, pin_position=DEFAULT_PIN_POSITION))
         return upd_participant.pin_position == DEFAULT_PIN_POSITION
+
+    def get_chat_groups(self, user_id: int) -> list[ChatGroup]:
+        chat_group_repo = self._ensure_chat_group_repo()
+        return chat_group_repo.find_all(user_id=user_id)
+
+    def replace_chat_groups(
+        self,
+        user_id: int,
+        groups: list[ChatGroup.Creation],
+    ) -> list[ChatGroup]:
+        chat_group_repo = self._ensure_chat_group_repo()
+
+        available_chats = self.chat_repo.find_all(user_id=user_id)
+        allowed_chat_ids = {chat.id for chat in available_chats if chat.type != ChatType.PRIVATE}
+
+        for group in groups:
+            invalid_chat_ids = [chat_id for chat_id in group.chat_ids if chat_id not in allowed_chat_ids]
+            if invalid_chat_ids:
+                raise ValueError(
+                    f'Group "{group.title}" has invalid chat ids: {invalid_chat_ids}'
+                )
+
+        return chat_group_repo.replace_all(user_id=user_id, groups=groups)
 
     def post_message(self, message: Message) -> None:
         chat = self.chat_repo.get_by_id(message.chat_id)
