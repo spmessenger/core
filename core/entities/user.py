@@ -11,13 +11,16 @@ class User(Base):
     username: str = Field(json_schema_extra={'unique': True})
     hashed_password: str
     refresh_tokens: list[str] = Field(default_factory=list)
+    avatar_url: str | None = None
 
     class Creation(Base.Creation):
         username: str
         hashed_password: str
+        avatar_url: str | None = None
 
     class Update(Base.Update):
         id: int
         username: str | None = None
         hashed_password: str | None = None
         refresh_tokens: list[str] | None = None
+        avatar_url: str | None = None

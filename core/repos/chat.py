@@ -52,7 +52,12 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
     PRIVATE_CHAT_TITLE = '\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435'
 
     @staticmethod
-    def _map_chat_model(chat_model: ChatModel, unread_count: int = 0, pin_position: int = 0) -> Chat:
+    def _map_chat_model(
+        chat_model: ChatModel,
+        unread_count: int = 0,
+        pin_position: int = 0,
+        current_user_id: int | None = None,
+    ) -> Chat:
         last_message = getattr(chat_model, 'last_message', None)
         last_message_at: str | None = None
         last_message_text: str | None = None
@@ -66,14 +71,28 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
                 ).isoformat()
 
         title = chat_model.title
+        avatar_url = chat_model.avatar_url
         if chat_model.type == ChatType.PRIVATE:
             title = DbChatRepo.PRIVATE_CHAT_TITLE
+        elif chat_model.type == ChatType.DIALOG and current_user_id is not None:
+            for participant in getattr(chat_model, 'participants', []):
+                if participant.user_id == current_user_id:
+                    continue
+                participant_user = getattr(participant, 'user', None)
+                participant_username = getattr(participant_user, 'username', None)
+                if participant_username:
+                    title = participant_username
+                participant_avatar_url = getattr(participant_user, 'avatar_url', None)
+                if participant_avatar_url:
+                    avatar_url = participant_avatar_url
+                if participant_username or participant_avatar_url:
+                    break
 
         return Chat(
             id=chat_model.id,
             type=chat_model.type,
             title=title,
-            avatar_url=chat_model.avatar_url,
+            avatar_url=avatar_url,
             last_message=last_message_text,
             last_message_at=last_message_at,
             unread_messages_count=unread_count,
@@ -142,10 +161,7 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         return self._map_chat_model(chat)
 
     @session_factory
-    def find_all(self, user_id: int | None = None, type: ChatType | None = None, with_user: bool = False, *, session: Session) -> list[Chat]:
-        # if user_id is None and with_user is True:
-        #     raise ValueError('You cannot get chats with user_id=None and with_user=True')
-
+    def find_all(self, user_id: int | None = None, type: ChatType | None = None, *, session: Session) -> list[Chat]:
         AliasedChatParticipants = aliased(self.participant_model)
         AliasedLastMessage = aliased(self.messages_model)
         ContextParticipant = aliased(self.participant_model)
@@ -159,7 +175,7 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         unread_messages_count = func.cast(0, Integer)
 
         if user_id is not None:
-            conds.and_(self.participant_model.user_id == user_id).and_(ContextParticipant.chat_visible == True)
+            conds.and_(ContextParticipant.chat_visible == True)
             unread_messages_count = (
                 select(func.count(self.messages_model.id))
                 .where(self.messages_model.chat_id == self.model.id)
@@ -232,13 +248,10 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
                 chat_model,
                 int(unread_count or 0),
                 int(context_participant.pin_position or 0),
+                current_user_id=user_id,
             )
             for chat_model, context_participant, unread_count in rows
         ]
-        # for chat in chats:
-        #     if chat.type != ChatType.DIALOG:
-        #         continue
-        #     chat.title = list(filter(lambda p: p.user_id != user_id, chat.participants)).pop().user.username
 
     @session_factory
     def find_all_by_user_id(self, user_id: int, *, session: Session) -> list[Chat]:
