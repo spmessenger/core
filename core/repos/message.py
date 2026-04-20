@@ -116,6 +116,12 @@ class InMemoryMessageRepo(AbstractMessageRepo, InMemoryRepo[Message]):
             content=message.content,
             participant_id=message.participant_id,
             reference_message_id=message.reference_message_id,
+            reference_author=message.reference_author,
+            reference_content=message.reference_content,
+            forwarded_from_message_id=message.forwarded_from_message_id,
+            forwarded_from_author=message.forwarded_from_author,
+            forwarded_from_author_avatar_url=message.forwarded_from_author_avatar_url,
+            forwarded_from_content=message.forwarded_from_content,
         )
         return self._save(entity)
 

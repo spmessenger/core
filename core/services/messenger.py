@@ -114,17 +114,73 @@ class MessengerService:
         sender_id: int,
         content: str,
         reference_message_id: int | None = None,
+        forwarded_from_message_id: int | None = None,
     ) -> Message:
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=sender_id)
+        if reference_message_id is not None and forwarded_from_message_id is not None:
+            raise ValueError('message cannot be reply and forward at the same time')
+
+        reference_author: str | None = None
+        reference_content: str | None = None
         if reference_message_id is not None:
             reference_message = self.message_repo.get_one(id=reference_message_id)
             if reference_message.chat_id != chat_id:
                 raise ValueError('reference_message_id must belong to the same chat')
+            # Resolve author via chat participants to avoid edge-case repo id lookup issues.
+            chat_participants = self.participant_repo.find_all(chat_id=chat_id)
+            reference_participant = next(
+                (
+                    participant
+                    for participant in chat_participants
+                    if participant.id == reference_message.participant_id
+                ),
+                None,
+            )
+            if reference_participant is not None:
+                reference_user = self.user_repo.find_one_by_id(reference_participant.user_id)
+                if reference_user is not None:
+                    reference_author = reference_user.username
+            reference_content = reference_message.content
+
+        forwarded_from_author: str | None = None
+        forwarded_from_author_avatar_url: str | None = None
+        forwarded_from_content: str | None = None
+        if forwarded_from_message_id is not None:
+            source_message = self.message_repo.get_one(id=forwarded_from_message_id)
+            source_participant = self.participant_repo.find_one(
+                chat_id=source_message.chat_id,
+                user_id=sender_id,
+            )
+            if source_participant is None:
+                raise ValueError('cannot forward message from inaccessible chat')
+
+            source_chat_participants = self.participant_repo.find_all(chat_id=source_message.chat_id)
+            source_author_participant = next(
+                (
+                    participant
+                    for participant in source_chat_participants
+                    if participant.id == source_message.participant_id
+                ),
+                None,
+            )
+            if source_author_participant is not None:
+                source_author_user = self.user_repo.find_one_by_id(source_author_participant.user_id)
+                if source_author_user is not None:
+                    forwarded_from_author = source_author_user.username
+                    forwarded_from_author_avatar_url = source_author_user.avatar_url
+            forwarded_from_content = source_message.content
+
         message = self.message_repo.save(
             Message.Creation(
                 chat_id=chat_id,
                 participant_id=participant.id,
                 reference_message_id=reference_message_id,
+                reference_author=reference_author,
+                reference_content=reference_content,
+                forwarded_from_message_id=forwarded_from_message_id,
+                forwarded_from_author=forwarded_from_author,
+                forwarded_from_author_avatar_url=forwarded_from_author_avatar_url,
+                forwarded_from_content=forwarded_from_content,
                 content=content,
             )
         )
