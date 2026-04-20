@@ -8,6 +8,14 @@ from .base import InMemoryRepo, DbRepo
 
 class AbstractMessageRepo(ABC):
     @abstractmethod
+    def get_one(self, id: int) -> Message:
+        pass
+
+    @abstractmethod
+    def find_one(self, id: int) -> Message | None:
+        pass
+
+    @abstractmethod
     def find_all(self, chat_id: int | None = None) -> list[Message]:
         pass
 
@@ -28,6 +36,22 @@ class AbstractMessageRepo(ABC):
 class DbMessageRepo(DbRepo, AbstractMessageRepo):
     model = ModelMessage
     entity_model = Message
+
+    @session_factory
+    def get_one(self, id: int, *, session: Session) -> Message:
+        query = select(self.model).where(self.model.id == id)
+        message = session.execute(query).scalar_one_or_none()
+        if message is None:
+            raise ValueError(f'Message with id={id} not found')
+        return Message.model_validate(message, from_attributes=True)
+
+    @session_factory
+    def find_one(self, id: int, *, session: Session) -> Message | None:
+        query = select(self.model).where(self.model.id == id)
+        message = session.execute(query).scalar_one_or_none()
+        if message is None:
+            return None
+        return Message.model_validate(message, from_attributes=True)
 
     @session_factory
     def find_all(self, chat_id: int | None = None, *, session: Session) -> list[Message]:
@@ -68,6 +92,18 @@ class DbMessageRepo(DbRepo, AbstractMessageRepo):
 
 
 class InMemoryMessageRepo(AbstractMessageRepo, InMemoryRepo[Message]):
+    def get_one(self, id: int) -> Message:
+        message = self.find_one(id=id)
+        if message is None:
+            raise ValueError(f'Message with id={id} not found')
+        return message
+
+    def find_one(self, id: int) -> Message | None:
+        for message in self._storage:
+            if message.id == id:
+                return message
+        return None
+
     def find_all(self, chat_id: int | None = None) -> list[Message]:
         if chat_id is None:
             return list(self._storage)
@@ -79,6 +115,7 @@ class InMemoryMessageRepo(AbstractMessageRepo, InMemoryRepo[Message]):
             chat_id=message.chat_id,
             content=message.content,
             participant_id=message.participant_id,
+            reference_message_id=message.reference_message_id,
         )
         return self._save(entity)
 

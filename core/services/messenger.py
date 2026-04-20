@@ -108,9 +108,26 @@ class MessengerService:
         ))
         return chat, participant
 
-    def send_message(self, chat_id: int, sender_id: int, content: str) -> Message:
+    def send_message(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        reference_message_id: int | None = None,
+    ) -> Message:
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=sender_id)
-        message = self.message_repo.save(Message.Creation(chat_id=chat_id, participant_id=participant.id, content=content))
+        if reference_message_id is not None:
+            reference_message = self.message_repo.get_one(id=reference_message_id)
+            if reference_message.chat_id != chat_id:
+                raise ValueError('reference_message_id must belong to the same chat')
+        message = self.message_repo.save(
+            Message.Creation(
+                chat_id=chat_id,
+                participant_id=participant.id,
+                reference_message_id=reference_message_id,
+                content=content,
+            )
+        )
         self.chat_repo.update_last_message(chat_id, message.id)
         self.post_message(message)
         return message
