@@ -130,5 +130,7 @@ class InMemoryUserRepo(InMemoryRepo[User], AbstractUserRepo):
             id=self._last_id,
             username=user.username,
             hashed_password=user.hashed_password,
+            subscription_tier=user.subscription_tier,
+            youtube_assisted_enabled=user.youtube_assisted_enabled,
         )
         return self._save(entity)

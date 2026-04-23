@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
-from sqlalchemy import Integer, and_, asc, case, desc, func, insert, select, update
+from sqlalchemy import Integer, and_, asc, case, delete, desc, func, insert, select, update
 from sqlalchemy.orm import aliased, joinedload
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from db.models import Chat as ChatModel, Participant as ParticipantModel, Message as MessageModel, User as UserModel, chat_last_message_association_table
@@ -34,7 +34,7 @@ class AbstractChatRepo(ABC):
         pass
 
     @abstractmethod
-    def update_last_message(self, chat_id: int, message_id: int):
+    def update_last_message(self, chat_id: int, message_id: int | None):
         pass
 
     @abstractmethod
@@ -124,7 +124,14 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
         return self._map_chat_model(chat)
 
     @session_factory
-    def update_last_message(self, chat_id: int, message_id: int, *, session: Session):
+    def update_last_message(self, chat_id: int, message_id: int | None, *, session: Session):
+        if message_id is None:
+            session.execute(
+                delete(self.ass_model).where(self.ass_model.c.chat_id == chat_id)
+            )
+            session.commit()
+            return
+
         query = (
             pg_insert(self.ass_model)
             .values({'chat_id': chat_id, 'message_id': message_id})
@@ -282,3 +289,32 @@ class InMemoryChatRepo(AbstractChatRepo, InMemoryRepo[Chat]):
             avatar_url=chat.avatar_url,
         )
         return self._save(entity)
+
+    def get_by_id(self, chat_id: int) -> Chat:
+        for chat in self._storage:
+            if chat.id == chat_id:
+                return chat
+        raise ValueError(f'Chat with id {chat_id} not found')
+
+    def find_dialog(self, user_id: int, participant_id: int) -> Chat | None:
+        chats = self.find_all_by_user_id(user_id)
+        participant_chat_ids = {chat.id for chat in self.find_all_by_user_id(participant_id)}
+        for chat in chats:
+            if chat.id in participant_chat_ids and chat.type == ChatType.DIALOG:
+                return chat
+        return None
+
+    def find_private_chat(self, user_id: int) -> Chat | None:
+        for chat in self.find_all_by_user_id(user_id):
+            if chat.type == ChatType.PRIVATE:
+                return chat
+        return None
+
+    def find_all(self, user_id: int | None = None, type: ChatType | None = None) -> list[Chat]:
+        chats = self._storage if user_id is None else self.find_all_by_user_id(user_id)
+        if type is not None:
+            chats = [chat for chat in chats if chat.type == type]
+        return list(chats)
+
+    def update_last_message(self, chat_id: int, message_id: int | None):
+        _ = chat_id, message_id

@@ -188,6 +188,27 @@ class MessengerService:
         self.post_message(message)
         return message
 
+    def delete_message(
+        self,
+        chat_id: int,
+        user_id: int,
+        message_id: int,
+    ) -> Message:
+        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
+        message = self.message_repo.get_one(id=message_id)
+        if message.chat_id != chat_id:
+            raise ValueError('message_id must belong to the same chat')
+        if message.participant_id != participant.id:
+            raise ValueError('You can delete only your own messages')
+
+        deleted_message = self.message_repo.delete_one(id=message_id)
+        chat_messages = self.message_repo.find_all(chat_id=chat_id)
+        if chat_messages:
+            self.chat_repo.update_last_message(chat_id=chat_id, message_id=chat_messages[-1].id)
+        else:
+            self.chat_repo.update_last_message(chat_id=chat_id, message_id=None)
+        return deleted_message
+
     def pin_chat(self, chat_id: int, user_id: int) -> bool:
         pin_position = self.participant_repo.get_max_pin_position(user_id) + 1
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)

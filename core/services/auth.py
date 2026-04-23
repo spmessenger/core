@@ -76,6 +76,31 @@ class AuthService:
             )
         )
 
+    def set_subscription_tier(self, user_id: int, tier: str) -> User:
+        normalized_tier = tier.strip().lower()
+        if normalized_tier not in {'free', 'premium'}:
+            raise ValueError('Unsupported subscription tier')
+        user = self.user_repo.get_by_id(user_id)
+        if user.subscription_tier == normalized_tier:
+            return user
+        return self.user_repo.update(
+            User.Update(
+                id=user.id,
+                subscription_tier=normalized_tier,
+            )
+        )
+
+    def set_youtube_assisted_enabled(self, user_id: int, enabled: bool) -> User:
+        user = self.user_repo.get_by_id(user_id)
+        if user.youtube_assisted_enabled == enabled:
+            return user
+        return self.user_repo.update(
+            User.Update(
+                id=user.id,
+                youtube_assisted_enabled=enabled,
+            )
+        )
+
     def get_auth(self, user_id: int) -> dict:
         access_token = self.jwt_token_manager.create_access_token({'id': user_id})
         refresh_token = self.jwt_token_manager.create_refresh_token({'id': user_id})

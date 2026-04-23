@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from sqlalchemy import asc, select
+from sqlalchemy import asc, delete, select, update
 from core.entities.message import Message
-from db.models import Message as ModelMessage
+from db.models import Message as ModelMessage, chat_last_message_association_table
 from db.session import session_factory, Session
 from .base import InMemoryRepo, DbRepo
 
@@ -24,6 +24,10 @@ class AbstractMessageRepo(ABC):
         pass
 
     @abstractmethod
+    def delete_one(self, id: int) -> Message:
+        pass
+
+    @abstractmethod
     def find_page(
         self,
         chat_id: int,
@@ -35,6 +39,7 @@ class AbstractMessageRepo(ABC):
 
 class DbMessageRepo(DbRepo, AbstractMessageRepo):
     model = ModelMessage
+    chat_last_message_association_model = chat_last_message_association_table
     entity_model = Message
 
     @session_factory
@@ -66,6 +71,35 @@ class DbMessageRepo(DbRepo, AbstractMessageRepo):
     @session_factory
     def save(self, message: Message.Creation, *, session: Session) -> Message:
         return super().save(message, session=session)
+
+    @session_factory
+    def delete_one(self, id: int, *, session: Session) -> Message:
+        # Clear message references in other messages before deleting the target row.
+        session.execute(
+            update(self.model)
+            .where(self.model.reference_message_id == id)
+            .values(reference_message_id=None)
+        )
+        session.execute(
+            update(self.model)
+            .where(self.model.forwarded_from_message_id == id)
+            .values(forwarded_from_message_id=None)
+        )
+        # Clear chat "last message" association if it points to the deleted message.
+        session.execute(
+            delete(self.chat_last_message_association_model)
+            .where(self.chat_last_message_association_model.c.message_id == id)
+        )
+        query = (
+            delete(self.model)
+            .where(self.model.id == id)
+            .returning(self.model)
+        )
+        deleted_model = session.execute(query).scalar_one_or_none()
+        if deleted_model is None:
+            raise ValueError(f'Message with id={id} not found')
+        session.commit()
+        return Message.model_validate(deleted_model, from_attributes=True)
 
     @session_factory
     def find_page(
@@ -124,6 +158,18 @@ class InMemoryMessageRepo(AbstractMessageRepo, InMemoryRepo[Message]):
             forwarded_from_content=message.forwarded_from_content,
         )
         return self._save(entity)
+
+    def delete_one(self, id: int) -> Message:
+        for message in self._storage:
+            if message.reference_message_id == id:
+                message.reference_message_id = None
+            if message.forwarded_from_message_id == id:
+                message.forwarded_from_message_id = None
+        for index, message in enumerate(self._storage):
+            if message.id == id:
+                deleted_message = self._storage.pop(index)
+                return deleted_message
+        raise ValueError(f'Message with id={id} not found')
 
     def find_page(
         self,

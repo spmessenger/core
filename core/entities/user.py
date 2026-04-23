@@ -12,11 +12,15 @@ class User(Base):
     hashed_password: str
     refresh_tokens: list[str] = Field(default_factory=list)
     avatar_url: str | None = None
+    subscription_tier: str = 'free'
+    youtube_assisted_enabled: bool = False
 
     class Creation(Base.Creation):
         username: str
         hashed_password: str
         avatar_url: str | None = None
+        subscription_tier: str = 'free'
+        youtube_assisted_enabled: bool = False
 
     class Update(Base.Update):
         id: int
@@ -24,3 +28,5 @@ class User(Base):
         hashed_password: str | None = None
         refresh_tokens: list[str] | None = None
         avatar_url: str | None = None
+        subscription_tier: str | None = None
+        youtube_assisted_enabled: bool | None = None
