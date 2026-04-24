@@ -20,7 +20,7 @@ def test_base_repo_check():
 
 def test_user_repo():
     repo = InMemoryUserRepo()
-    creation = User.Creation(username="test", hashed_password="test")
+    creation = User.Creation(username="test", email="test@example.com", hashed_password="test")
     repo.save(creation)
     with pytest.raises(ValueError, match="Field username is not unique"):
         repo.save(creation)

@@ -17,20 +17,50 @@ class AuthService:
             refresh_token_expire_days=7
         )
 
-    def login(self, username: str, password: str) -> tuple[User, dict]:
-        user = self.user_repo.find_one_by_username(username)
+    def _normalize_email(self, email: str) -> str:
+        normalized = email.strip().lower()
+        if '@' not in normalized or normalized.startswith('@') or normalized.endswith('@'):
+            raise ValueError('Invalid email')
+        return normalized
+
+    def _assert_verification_code(self, verification_code: str) -> None:
+        if verification_code != settings.AUTH_DEFAULT_VERIFICATION_CODE:
+            raise ValueError('Incorrect verification code')
+
+    def _build_unique_username_from_email(self, email: str) -> str:
+        base = email.split('@', 1)[0].strip().lower()
+        sanitized = ''.join(char for char in base if char.isalnum() or char in {'_', '.'})
+        if not sanitized:
+            sanitized = 'user'
+        max_len = 16
+        candidate = sanitized[:max_len]
+        suffix = 1
+        while self.user_repo.find_one_by_username(candidate) is not None:
+            suffix_text = str(suffix)
+            candidate = f'{sanitized[:max_len - len(suffix_text)]}{suffix_text}'
+            suffix += 1
+        return candidate
+
+    def login(self, email: str, verification_code: str) -> tuple[User, dict]:
+        self._assert_verification_code(verification_code)
+        normalized_email = self._normalize_email(email)
+        user = self.user_repo.find_one_by_email(normalized_email)
         if user is None:
-            raise ValueError(f'User {username} not found')
-        if user.hashed_password != hash_password(password):
-            raise ValueError('Incorrect password')
+            raise ValueError(f'User with email {normalized_email} not found')
         auth = self.get_auth(user.id)
         user = self.user_repo.update(User.Update(id=user.id, refresh_tokens=[*user.refresh_tokens, auth['refresh_token']]))
         return user, auth
 
-    def register(self, username: str, pure_password: str) -> tuple[User, Chat, dict]:
+    def register(self, email: str, verification_code: str) -> tuple[User, Chat, dict]:
+        self._assert_verification_code(verification_code)
+        normalized_email = self._normalize_email(email)
+        if self.user_repo.find_one_by_email(normalized_email) is not None:
+            raise ValueError(f'User with email {normalized_email} already exists')
+        username = self._build_unique_username_from_email(normalized_email)
         user = self.user_repo.save(User.Creation(
             username=username,
-            hashed_password=hash_password(pure_password)
+            email=normalized_email,
+            hashed_password=hash_password(settings.AUTH_DEFAULT_VERIFICATION_CODE),
         ))
         private_chat, _ = self.messenger_service.create_private_chat(user.id)
         auth = self.get_auth(user.id)

@@ -6,10 +6,11 @@ from tests.conftest import auth_service as service
 
 
 def test_register(service: AuthService):
-    registered_user, private_chat, auth = service.register(username='test', pure_password='test')
+    registered_user, private_chat, auth = service.register(email='test@example.com', verification_code='0000')
 
     assert registered_user.username == 'test'
-    assert registered_user.hashed_password == hash_password('test')
+    assert registered_user.email == 'test@example.com'
+    assert registered_user.hashed_password == hash_password('0000')
     assert len(registered_user.refresh_tokens) == 1
     assert auth['refresh_token'] in registered_user.refresh_tokens
 
@@ -17,23 +18,23 @@ def test_register(service: AuthService):
 
 
 def test_double_register(service: AuthService):
-    service.register(username='test', pure_password='test')
+    service.register(email='test@example.com', verification_code='0000')
     with pytest.raises(ValueError):
-        service.register(username='test', pure_password='test')
+        service.register(email='test@example.com', verification_code='0000')
 
 
 def test_register_and_login(service: AuthService):
-    registered_user, private_chat, auth = service.register(username='test', pure_password='test')
+    registered_user, private_chat, auth = service.register(email='test@example.com', verification_code='0000')
     assert len(registered_user.refresh_tokens) == 1
 
-    login_user, login_auth = service.login(username='test', password='test')
+    login_user, login_auth = service.login(email='test@example.com', verification_code='0000')
 
     assert login_user.id == registered_user.id
     assert len(login_user.refresh_tokens) == 2
 
 
 def test_refresh_token(service: AuthService):
-    user, _, auth = service.register(username='test', pure_password='test')
+    user, _, auth = service.register(email='test@example.com', verification_code='0000')
 
     service.refresh_token(auth['refresh_token'])
     user = service.user_repo.get_by_id(user.id)
@@ -42,7 +43,7 @@ def test_refresh_token(service: AuthService):
 
 
 def test_update_profile(service: AuthService):
-    user, _, _ = service.register(username='test', pure_password='test')
+    user, _, _ = service.register(email='test@example.com', verification_code='0000')
 
     updated_user = service.update_profile(user.id, 'updated')
 
@@ -50,7 +51,7 @@ def test_update_profile(service: AuthService):
 
 
 def test_update_profile_rejects_blank_username(service: AuthService):
-    user, _, _ = service.register(username='test', pure_password='test')
+    user, _, _ = service.register(email='test@example.com', verification_code='0000')
 
     with pytest.raises(ValueError, match='Username cannot be empty'):
         service.update_profile(user.id, '   ')

@@ -4,6 +4,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     SECRET_KEY: str = 'secret'
+    AUTH_DEFAULT_VERIFICATION_CODE: str = '0000'
 
 
 @lru_cache()
