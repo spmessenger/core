@@ -9,7 +9,7 @@ UserId = NewType("UserId", int)
 class User(Base):
     id: UserId
     username: str = Field(json_schema_extra={'unique': True})
-    email: str = Field(json_schema_extra={'unique': True})
+    email: str | None = Field(default=None, json_schema_extra={'unique': True})
     hashed_password: str
     refresh_tokens: list[str] = Field(default_factory=list)
     avatar_url: str | None = None
@@ -18,7 +18,7 @@ class User(Base):
 
     class Creation(Base.Creation):
         username: str
-        email: str
+        email: str | None = None
         hashed_password: str
         avatar_url: str | None = None
         subscription_tier: str = 'free'

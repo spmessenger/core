@@ -1,6 +1,6 @@
 from core.misc.utils.hash import hash_password
 from core.misc.auth.jwt import JWTTokenManager
-from core.entities import ChatType, User, Chat
+from core.entities import User, Chat
 from core.repos.abc import AbstractUserRepo
 from core.settings import settings
 from core.services.messenger import MessengerService
@@ -17,50 +17,49 @@ class AuthService:
             refresh_token_expire_days=7
         )
 
-    def _normalize_email(self, email: str) -> str:
+    def _normalize_email(self, email: str | None) -> str | None:
+        if email is None:
+            return None
         normalized = email.strip().lower()
+        if not normalized:
+            return None
         if '@' not in normalized or normalized.startswith('@') or normalized.endswith('@'):
             raise ValueError('Invalid email')
         return normalized
 
-    def _assert_verification_code(self, verification_code: str) -> None:
-        if verification_code != settings.AUTH_DEFAULT_VERIFICATION_CODE:
-            raise ValueError('Incorrect verification code')
+    def _normalize_username(self, username: str) -> str:
+        normalized = username.strip()
+        if not normalized:
+            raise ValueError('Username cannot be empty')
+        return normalized
 
-    def _build_unique_username_from_email(self, email: str) -> str:
-        base = email.split('@', 1)[0].strip().lower()
-        sanitized = ''.join(char for char in base if char.isalnum() or char in {'_', '.'})
-        if not sanitized:
-            sanitized = 'user'
-        max_len = 16
-        candidate = sanitized[:max_len]
-        suffix = 1
-        while self.user_repo.find_one_by_username(candidate) is not None:
-            suffix_text = str(suffix)
-            candidate = f'{sanitized[:max_len - len(suffix_text)]}{suffix_text}'
-            suffix += 1
-        return candidate
+    def _normalize_password(self, password: str) -> str:
+        normalized = password.strip()
+        if not normalized:
+            raise ValueError('Password cannot be empty')
+        return normalized
 
-    def login(self, email: str, verification_code: str) -> tuple[User, dict]:
-        self._assert_verification_code(verification_code)
-        normalized_email = self._normalize_email(email)
-        user = self.user_repo.find_one_by_email(normalized_email)
+    def login(self, username: str, password: str) -> tuple[User, dict]:
+        normalized_username = self._normalize_username(username)
+        normalized_password = self._normalize_password(password)
+        user = self.user_repo.find_one_by_username(normalized_username)
         if user is None:
-            raise ValueError(f'User with email {normalized_email} not found')
+            raise ValueError(f'User with username {normalized_username} not found')
+        if user.hashed_password != hash_password(normalized_password):
+            raise ValueError('Incorrect password')
         auth = self.get_auth(user.id)
         user = self.user_repo.update(User.Update(id=user.id, refresh_tokens=[*user.refresh_tokens, auth['refresh_token']]))
         return user, auth
 
-    def register(self, email: str, verification_code: str) -> tuple[User, Chat, dict]:
-        self._assert_verification_code(verification_code)
-        normalized_email = self._normalize_email(email)
-        if self.user_repo.find_one_by_email(normalized_email) is not None:
-            raise ValueError(f'User with email {normalized_email} already exists')
-        username = self._build_unique_username_from_email(normalized_email)
+    def register(self, username: str, password: str) -> tuple[User, Chat, dict]:
+        normalized_username = self._normalize_username(username)
+        normalized_password = self._normalize_password(password)
+        if self.user_repo.find_one_by_username(normalized_username) is not None:
+            raise ValueError(f'User with username {normalized_username} already exists')
         user = self.user_repo.save(User.Creation(
-            username=username,
-            email=normalized_email,
-            hashed_password=hash_password(settings.AUTH_DEFAULT_VERIFICATION_CODE),
+            username=normalized_username,
+            email=None,
+            hashed_password=hash_password(normalized_password),
         ))
         private_chat, _ = self.messenger_service.create_private_chat(user.id)
         auth = self.get_auth(user.id)
@@ -85,6 +84,7 @@ class AuthService:
         self,
         user_id: int,
         username: str | None = None,
+        email: str | None = None,
         avatar_url: str | None = None,
     ) -> User:
         user = self.user_repo.get_by_id(user_id)
@@ -95,13 +95,19 @@ class AuthService:
                 raise ValueError('Username cannot be empty')
             next_username = normalized_username
 
-        if user.username == next_username and user.avatar_url == avatar_url:
+        next_email = user.email
+        if email is not None:
+            normalized_email = self._normalize_email(email)
+            next_email = user.email if normalized_email is None else normalized_email
+
+        if user.username == next_username and user.avatar_url == avatar_url and user.email == next_email:
             return user
 
         return self.user_repo.update(
             User.Update(
                 id=user.id,
                 username=next_username,
+                email=next_email,
                 avatar_url=avatar_url,
             )
         )
