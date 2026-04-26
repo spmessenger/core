@@ -183,17 +183,7 @@ class DbChatRepo(DbRepo, AbstractChatRepo):
 
         if user_id is not None:
             conds.and_(ContextParticipant.chat_visible == True)
-            unread_messages_count = (
-                select(func.count(self.messages_model.id))
-                .where(self.messages_model.chat_id == self.model.id)
-                .where(self.messages_model.participant_id != ContextParticipant.id)
-                .where(
-                    self.messages_model.id
-                    > func.coalesce(ContextParticipant.last_read_message_id, 0)
-                )
-                .correlate(self.model, ContextParticipant)
-                .scalar_subquery()
-            )
+            unread_messages_count = func.coalesce(ContextParticipant.unread_messages_count, 0)
 
         models = (
             self.model,

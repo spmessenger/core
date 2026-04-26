@@ -20,6 +20,7 @@ class Participant(Base):
     pin_position: int = 0
     chat_visible: bool = True
     last_read_message_id: int | None = None
+    unread_messages_count: int = 0
 
     class Update(Base.Update):
         id: int
@@ -28,6 +29,7 @@ class Participant(Base):
         pin_position: int | None = None
         chat_visible: bool | None = None
         last_read_message_id: int | None = None
+        unread_messages_count: int | None = None
 
     class Creation(Base.Creation):
         chat_id: int
@@ -37,6 +39,7 @@ class Participant(Base):
         pin_position: int = 0
         chat_visible: bool = True
         last_read_message_id: int | None = None
+        unread_messages_count: int = 0
 
     class AdminCreation(Creation):
         role: ParticipantType = ParticipantType.ADMIN

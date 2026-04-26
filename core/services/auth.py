@@ -2,9 +2,11 @@ from core.misc.utils.hash import hash_password
 from core.misc.auth.jwt import JWTTokenManager
 from core.entities import User, Chat
 from core.repos.abc import AbstractUserRepo
-from core.settings import settings
+from core.settings import get_settings
 from core.services.messenger import MessengerService
 
+
+settings = get_settings()
 
 class AuthService:
     def __init__(self, user_repo: AbstractUserRepo, messenger_service: MessengerService):

@@ -33,6 +33,7 @@ class MessengerService:
     def get_chat_messages(self, chat_id: int, user_id: int) -> tuple[Participant, list[Message]]:
         participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
         messages = self.message_repo.find_all(chat_id=chat_id)
+        self.participant_repo.reset_unread_messages_count(chat_id=chat_id, user_id=user_id)
         if messages:
             participant = self.participant_repo.update_last_read_message(
                 chat_id=chat_id,
@@ -49,6 +50,7 @@ class MessengerService:
         limit: int = 50,
     ) -> tuple[Participant, list[Message], bool]:
         participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
+        self.participant_repo.reset_unread_messages_count(chat_id=chat_id, user_id=user_id)
         messages, has_more = self.message_repo.find_page(
             chat_id=chat_id,
             before_message_id=before_message_id,
@@ -115,6 +117,7 @@ class MessengerService:
         content: str,
         reference_message_id: int | None = None,
         forwarded_from_message_id: int | None = None,
+        connected_user_ids: set[int] | None = None,
     ) -> Message:
         participant = self.participant_repo.get_one(chat_id=chat_id, user_id=sender_id)
         if reference_message_id is not None and forwarded_from_message_id is not None:
@@ -185,6 +188,12 @@ class MessengerService:
             )
         )
         self.chat_repo.update_last_message(chat_id, message.id)
+        excluded_user_ids = set(connected_user_ids or set())
+        excluded_user_ids.add(sender_id)
+        self.participant_repo.increment_unread_messages_count(
+            chat_id=chat_id,
+            excluded_user_ids=excluded_user_ids,
+        )
         self.post_message(message)
         return message
 

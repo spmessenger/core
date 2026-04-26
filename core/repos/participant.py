@@ -38,6 +38,18 @@ class AbstractParticipantRepo(ABC):
         pass
 
     @abstractmethod
+    def increment_unread_messages_count(
+        self,
+        chat_id: int,
+        excluded_user_ids: set[int] | None = None,
+    ) -> list[Participant]:
+        pass
+
+    @abstractmethod
+    def reset_unread_messages_count(self, chat_id: int, user_id: int) -> Participant:
+        pass
+
+    @abstractmethod
     def save(self, participant: Participant.Creation) -> Participant:
         pass
 
@@ -144,6 +156,49 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         return Participant.model_validate(participant, from_attributes=True)
 
     @session_factory
+    def increment_unread_messages_count(
+        self,
+        chat_id: int,
+        excluded_user_ids: set[int] | None = None,
+        *,
+        session: Session,
+    ) -> list[Participant]:
+        query = (
+            update(self.model)
+            .values(unread_messages_count=self.model.unread_messages_count + 1)
+            .where(self.model.chat_id == chat_id)
+        )
+        if excluded_user_ids:
+            query = query.where(~self.model.user_id.in_(excluded_user_ids))
+        query = query.returning(self.model)
+        updated = session.execute(query).scalars().all()
+        session.commit()
+        return [Participant.model_validate(participant, from_attributes=True) for participant in updated]
+
+    @session_factory
+    def reset_unread_messages_count(
+        self,
+        chat_id: int,
+        user_id: int,
+        *,
+        session: Session,
+    ) -> Participant:
+        query = (
+            update(self.model)
+            .values(unread_messages_count=0)
+            .where(self.model.chat_id == chat_id)
+            .where(self.model.user_id == user_id)
+            .returning(self.model)
+        )
+        participant = session.execute(query).scalar_one_or_none()
+        if participant is None:
+            raise ValueError(
+                f'Participant with chat_id={chat_id} and user_id={user_id} not found'
+            )
+        session.commit()
+        return Participant.model_validate(participant, from_attributes=True)
+
+    @session_factory
     def save(self, participant: Participant.Creation, *, session: Session) -> Participant:
         return super().save(participant, session=session)
 
@@ -162,6 +217,7 @@ class InMemoryParticipantRepo(AbstractParticipantRepo, InMemoryRepo[Participant]
             pin_position=participant.pin_position,
             chat_visible=participant.chat_visible,
             last_read_message_id=participant.last_read_message_id,
+            unread_messages_count=participant.unread_messages_count,
         )
         return self._save(entity)
 
@@ -175,5 +231,29 @@ class InMemoryParticipantRepo(AbstractParticipantRepo, InMemoryRepo[Participant]
         updated = Participant.Update(
             id=participant.id,
             last_read_message_id=last_read_message_id,
+        )
+        return self.update(updated)
+
+    def increment_unread_messages_count(
+        self,
+        chat_id: int,
+        excluded_user_ids: set[int] | None = None,
+    ) -> list[Participant]:
+        excluded_user_ids = excluded_user_ids or set()
+        updated_participants: list[Participant] = []
+        for participant in self._storage:
+            if participant.chat_id != chat_id:
+                continue
+            if participant.user_id in excluded_user_ids:
+                continue
+            participant.unread_messages_count += 1
+            updated_participants.append(participant)
+        return updated_participants
+
+    def reset_unread_messages_count(self, chat_id: int, user_id: int) -> Participant:
+        participant = self.get_one(chat_id=chat_id, user_id=user_id)
+        updated = Participant.Update(
+            id=participant.id,
+            unread_messages_count=0,
         )
         return self.update(updated)

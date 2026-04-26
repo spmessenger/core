@@ -88,6 +88,33 @@ def test_send_message(messenger: MessengerService):
     assert message.content == 'test'
 
 
+def test_unread_counter_increments_and_resets_on_connect(messenger: MessengerService):
+    user_id = 1
+    user_id2 = 2
+    chat, _ = messenger.create_dialog(user_id, user_id2)
+
+    messenger.send_message(chat.id, user_id, 'test')
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert chats[0].unread_messages_count == 1
+
+    participant, _ = messenger.get_chat_messages(chat_id=chat.id, user_id=user_id2)
+    assert participant.unread_messages_count == 0
+
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert chats[0].unread_messages_count == 0
+
+
+def test_unread_counter_does_not_increment_for_connected_users(messenger: MessengerService):
+    user_id = 1
+    user_id2 = 2
+    chat, _ = messenger.create_dialog(user_id, user_id2)
+
+    messenger.send_message(chat.id, user_id, 'test', connected_user_ids={user_id2})
+
+    chats = messenger.chat_repo.find_all(user_id=user_id2)
+    assert chats[0].unread_messages_count == 0
+
+
 def test_pin_unpin_chat(messenger_service: MessengerService):
     user_id = 1
     participant_id = 2
