@@ -3,6 +3,7 @@ from .chat_group import InMemoryChatGroupRepo, DbChatGroupRepo
 from .participant import InMemoryParticipantRepo, DbParticipantRepo
 from .user import InMemoryUserRepo, DbUserRepo
 from .message import InMemoryMessageRepo, DbMessageRepo
+from .room import InMemoryYouTubeRoomRepo, DbYouTubeRoomRepo
 
 
 __all__ = [
@@ -16,4 +17,6 @@ __all__ = [
     'DbUserRepo',
     'DbMessageRepo',
     'DbParticipantRepo',
+    'InMemoryYouTubeRoomRepo',
+    'DbYouTubeRoomRepo',
 ]

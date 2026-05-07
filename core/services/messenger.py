@@ -31,9 +31,11 @@ class MessengerService:
         return self.participant_repo.find_all(chat_id=chat_id)
 
     def get_chat_messages(self, chat_id: int, user_id: int) -> tuple[Participant, list[Message]]:
-        participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
+        participant = self.get_chat_participant(
+            chat_id=chat_id, user_id=user_id)
         messages = self.message_repo.find_all(chat_id=chat_id)
-        self.participant_repo.reset_unread_messages_count(chat_id=chat_id, user_id=user_id)
+        self.participant_repo.reset_unread_messages_count(
+            chat_id=chat_id, user_id=user_id)
         if messages:
             participant = self.participant_repo.update_last_read_message(
                 chat_id=chat_id,
@@ -49,8 +51,10 @@ class MessengerService:
         before_message_id: int | None = None,
         limit: int = 50,
     ) -> tuple[Participant, list[Message], bool]:
-        participant = self.get_chat_participant(chat_id=chat_id, user_id=user_id)
-        self.participant_repo.reset_unread_messages_count(chat_id=chat_id, user_id=user_id)
+        participant = self.get_chat_participant(
+            chat_id=chat_id, user_id=user_id)
+        self.participant_repo.reset_unread_messages_count(
+            chat_id=chat_id, user_id=user_id)
         messages, has_more = self.message_repo.find_page(
             chat_id=chat_id,
             before_message_id=before_message_id,
@@ -66,15 +70,19 @@ class MessengerService:
 
     def create_dialog(self, user_id: int, participant_id: int) -> tuple[Chat, list[Participant]]:
         if user_id == participant_id:
-            raise ValueError('You cannot create dialog with user_id=participant_id')
-        dialog = self.chat_repo.find_dialog(user_id=user_id, participant_id=participant_id)
+            raise ValueError(
+                'You cannot create dialog with user_id=participant_id')
+        dialog = self.chat_repo.find_dialog(
+            user_id=user_id, participant_id=participant_id)
         if dialog is not None:
             return dialog, self.participant_repo.update_chat_visible_to_all(chat_id=dialog.id, visible=True)
 
         chat = self.chat_repo.save(Chat.DialogCreation())
         participants = [
-            self.participant_repo.save(Participant.MemberCreation(chat_id=chat.id, user_id=user_id)),
-            self.participant_repo.save(Participant.MemberCreation(chat_id=chat.id, user_id=participant_id, chat_visible=False)),
+            self.participant_repo.save(Participant.MemberCreation(
+                chat_id=chat.id, user_id=user_id)),
+            self.participant_repo.save(Participant.MemberCreation(
+                chat_id=chat.id, user_id=participant_id, chat_visible=False)),
         ]
         return chat, participants
 
@@ -87,10 +95,12 @@ class MessengerService:
     ) -> tuple[Chat, list[Participant]]:
         participants = list(filter(lambda p: p != user_id, participants))
 
-        chat = self.chat_repo.save(Chat.GroupChatCreation(title=title, avatar_url=avatar_url))
+        chat = self.chat_repo.save(Chat.GroupChatCreation(
+            title=title, avatar_url=avatar_url))
         chat_participants = [
             self.participant_repo.save(
-                Participant.MemberCreation(chat_id=chat.id, user_id=participant_id)
+                Participant.MemberCreation(
+                    chat_id=chat.id, user_id=participant_id)
             )
             for participant_id in participants
         ]
@@ -119,16 +129,20 @@ class MessengerService:
         forwarded_from_message_id: int | None = None,
         connected_user_ids: set[int] | None = None,
     ) -> Message:
-        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=sender_id)
+        participant = self.participant_repo.get_one(
+            chat_id=chat_id, user_id=sender_id)
         if reference_message_id is not None and forwarded_from_message_id is not None:
-            raise ValueError('message cannot be reply and forward at the same time')
+            raise ValueError(
+                'message cannot be reply and forward at the same time')
 
         reference_author: str | None = None
         reference_content: str | None = None
         if reference_message_id is not None:
-            reference_message = self.message_repo.get_one(id=reference_message_id)
+            reference_message = self.message_repo.get_one(
+                id=reference_message_id)
             if reference_message.chat_id != chat_id:
-                raise ValueError('reference_message_id must belong to the same chat')
+                raise ValueError(
+                    'reference_message_id must belong to the same chat')
             # Resolve author via chat participants to avoid edge-case repo id lookup issues.
             chat_participants = self.participant_repo.find_all(chat_id=chat_id)
             reference_participant = next(
@@ -140,7 +154,8 @@ class MessengerService:
                 None,
             )
             if reference_participant is not None:
-                reference_user = self.user_repo.find_one_by_id(reference_participant.user_id)
+                reference_user = self.user_repo.find_one_by_id(
+                    reference_participant.user_id)
                 if reference_user is not None:
                     reference_author = reference_user.username
             reference_content = reference_message.content
@@ -149,15 +164,18 @@ class MessengerService:
         forwarded_from_author_avatar_url: str | None = None
         forwarded_from_content: str | None = None
         if forwarded_from_message_id is not None:
-            source_message = self.message_repo.get_one(id=forwarded_from_message_id)
+            source_message = self.message_repo.get_one(
+                id=forwarded_from_message_id)
             source_participant = self.participant_repo.find_one(
                 chat_id=source_message.chat_id,
                 user_id=sender_id,
             )
             if source_participant is None:
-                raise ValueError('cannot forward message from inaccessible chat')
+                raise ValueError(
+                    'cannot forward message from inaccessible chat')
 
-            source_chat_participants = self.participant_repo.find_all(chat_id=source_message.chat_id)
+            source_chat_participants = self.participant_repo.find_all(
+                chat_id=source_message.chat_id)
             source_author_participant = next(
                 (
                     participant
@@ -167,7 +185,8 @@ class MessengerService:
                 None,
             )
             if source_author_participant is not None:
-                source_author_user = self.user_repo.find_one_by_id(source_author_participant.user_id)
+                source_author_user = self.user_repo.find_one_by_id(
+                    source_author_participant.user_id)
                 if source_author_user is not None:
                     forwarded_from_author = source_author_user.username
                     forwarded_from_author_avatar_url = source_author_user.avatar_url
@@ -197,13 +216,31 @@ class MessengerService:
         self.post_message(message)
         return message
 
+    def reply():
+        ...
+
+    def forward():
+        ...
+
+    def _create_metadata(self, message: Message) -> dict:
+        metadata = {}
+        youtube_meta = self._create_metadata_youtube(message)
+        if youtube_meta:
+            metadata['youtube'] = youtube_meta
+        return metadata
+
+    def _create_metadata_youtube(self, message: Message) -> dict | None:
+        ...
+
+
     def delete_message(
         self,
         chat_id: int,
         user_id: int,
         message_id: int,
     ) -> Message:
-        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
+        participant = self.participant_repo.get_one(
+            chat_id=chat_id, user_id=user_id)
         message = self.message_repo.get_one(id=message_id)
         if message.chat_id != chat_id:
             raise ValueError('message_id must belong to the same chat')
@@ -213,20 +250,26 @@ class MessengerService:
         deleted_message = self.message_repo.delete_one(id=message_id)
         chat_messages = self.message_repo.find_all(chat_id=chat_id)
         if chat_messages:
-            self.chat_repo.update_last_message(chat_id=chat_id, message_id=chat_messages[-1].id)
+            self.chat_repo.update_last_message(
+                chat_id=chat_id, message_id=chat_messages[-1].id)
         else:
-            self.chat_repo.update_last_message(chat_id=chat_id, message_id=None)
+            self.chat_repo.update_last_message(
+                chat_id=chat_id, message_id=None)
         return deleted_message
 
     def pin_chat(self, chat_id: int, user_id: int) -> bool:
         pin_position = self.participant_repo.get_max_pin_position(user_id) + 1
-        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
-        upd_participant = self.participant_repo.update(Participant.Update(id=participant.id, pin_position=pin_position))
+        participant = self.participant_repo.get_one(
+            chat_id=chat_id, user_id=user_id)
+        upd_participant = self.participant_repo.update(
+            Participant.Update(id=participant.id, pin_position=pin_position))
         return upd_participant.pin_position == pin_position
 
     def unpin_chat(self, chat_id: int, user_id: int) -> bool:
-        participant = self.participant_repo.get_one(chat_id=chat_id, user_id=user_id)
-        upd_participant = self.participant_repo.update(Participant.Update(id=participant.id, pin_position=DEFAULT_PIN_POSITION))
+        participant = self.participant_repo.get_one(
+            chat_id=chat_id, user_id=user_id)
+        upd_participant = self.participant_repo.update(Participant.Update(
+            id=participant.id, pin_position=DEFAULT_PIN_POSITION))
         return upd_participant.pin_position == DEFAULT_PIN_POSITION
 
     def get_chat_groups(self, user_id: int) -> list[ChatGroup]:
@@ -241,10 +284,12 @@ class MessengerService:
         chat_group_repo = self._ensure_chat_group_repo()
 
         available_chats = self.chat_repo.find_all(user_id=user_id)
-        allowed_chat_ids = {chat.id for chat in available_chats if chat.type != ChatType.PRIVATE}
+        allowed_chat_ids = {
+            chat.id for chat in available_chats if chat.type != ChatType.PRIVATE}
 
         for group in groups:
-            invalid_chat_ids = [chat_id for chat_id in group.chat_ids if chat_id not in allowed_chat_ids]
+            invalid_chat_ids = [
+                chat_id for chat_id in group.chat_ids if chat_id not in allowed_chat_ids]
             if invalid_chat_ids:
                 raise ValueError(
                     f'Group "{group.title}" has invalid chat ids: {invalid_chat_ids}'
@@ -255,4 +300,5 @@ class MessengerService:
     def post_message(self, message: Message) -> None:
         chat = self.chat_repo.get_by_id(message.chat_id)
         if chat.type == ChatType.DIALOG:
-            self.participant_repo.update_chat_visible_to_all(chat_id=chat.id, visible=True)
+            self.participant_repo.update_chat_visible_to_all(
+                chat_id=chat.id, visible=True)

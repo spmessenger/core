@@ -3,6 +3,7 @@ from .chat_group import AbstractChatGroupRepo
 from .participant import AbstractParticipantRepo
 from .user import AbstractUserRepo
 from .message import AbstractMessageRepo
+from .room import AbstractYouTubeRoomRepo
 
 __all__ = [
     'AbstractChatRepo',
@@ -10,4 +11,5 @@ __all__ = [
     'AbstractParticipantRepo',
     'AbstractUserRepo',
     'AbstractMessageRepo',
+    'AbstractYouTubeRoomRepo',
 ]
