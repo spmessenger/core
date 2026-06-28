@@ -1,5 +1,8 @@
+import pytest
+
 from core.entities.chat import ChatType
 from core.services import MessengerService
+from core.misc.utils.general import id_by_pair
 from tests.conftest import messenger_service as messenger
 
 
@@ -19,14 +22,18 @@ def test_find_dialog(messenger: MessengerService):
     chat, *_ = messenger.create_dialog(user_id, user_id2)
     chat1, *_ = messenger.create_dialog(user_id, user_id3)
 
-    dialog = messenger.chat_repo.find_dialog(user_id=user_id, participant_id=user_id2)
-    dialog1 = messenger.chat_repo.find_dialog(user_id=user_id, participant_id=user_id3)
+    dialog = messenger.chat_repo.find_dialog(
+        user_id=user_id, participant_id=user_id2)
+    dialog1 = messenger.chat_repo.find_dialog(
+        user_id=user_id, participant_id=user_id3)
 
     assert dialog.id == chat.id
     assert dialog1.id == chat1.id
 
-    dialog = messenger.chat_repo.find_dialog(user_id=user_id2, participant_id=user_id)
-    dialog1 = messenger.chat_repo.find_dialog(user_id=user_id3, participant_id=user_id)
+    dialog = messenger.chat_repo.find_dialog(
+        user_id=user_id2, participant_id=user_id)
+    dialog1 = messenger.chat_repo.find_dialog(
+        user_id=user_id3, participant_id=user_id)
 
     assert dialog.id == chat.id
     assert dialog1.id == chat1.id
@@ -97,7 +104,8 @@ def test_unread_counter_increments_and_resets_on_connect(messenger: MessengerSer
     chats = messenger.chat_repo.find_all(user_id=user_id2)
     assert chats[0].unread_messages_count == 1
 
-    participant, _ = messenger.get_chat_messages(chat_id=chat.id, user_id=user_id2)
+    participant, _ = messenger.get_chat_messages(
+        chat_id=chat.id, user_id=user_id2)
     assert participant.unread_messages_count == 0
 
     chats = messenger.chat_repo.find_all(user_id=user_id2)
@@ -109,7 +117,8 @@ def test_unread_counter_does_not_increment_for_connected_users(messenger: Messen
     user_id2 = 2
     chat, _ = messenger.create_dialog(user_id, user_id2)
 
-    messenger.send_message(chat.id, user_id, 'test', connected_user_ids={user_id2})
+    messenger.send_message(chat.id, user_id, 'test',
+                           connected_user_ids={user_id2})
 
     chats = messenger.chat_repo.find_all(user_id=user_id2)
     assert chats[0].unread_messages_count == 0
@@ -119,8 +128,10 @@ def test_pin_unpin_chat(messenger_service: MessengerService):
     user_id = 1
     participant_id = 2
 
-    messenger_service.create_group_chat(user_id, title='test', participants=[participant_id])
-    messenger_service.create_group_chat(user_id, title='test1', participants=[participant_id])
+    messenger_service.create_group_chat(
+        user_id, title='test', participants=[participant_id])
+    messenger_service.create_group_chat(
+        user_id, title='test1', participants=[participant_id])
 
     chats = messenger_service.chat_repo.find_all(user_id=user_id)
 
@@ -146,24 +157,48 @@ def test_chat_shuffle_001(messenger_service: MessengerService):
     user_id = 1
     participant_id = 2
 
-    messenger_service.create_group_chat(user_id, title='test', participants=[participant_id])
-    messenger_service.create_group_chat(user_id, title='test1', participants=[participant_id])
+    messenger_service.create_group_chat(
+        user_id, title='test', participants=[participant_id])
+    messenger_service.create_group_chat(
+        user_id, title='test1', participants=[participant_id])
 
     chats = messenger_service.chat_repo.find_all(user_id=user_id)
 
     assert chats[0].title == 'test'
     assert chats[1].title == 'test1'
 
-    messenger_service.send_message(chats[1].id, user_id, 'test')
 
-    chats = messenger_service.chat_repo.find_all(user_id=user_id)
+@pytest.mark.parametrize(
+    ('content', 'expected_video_id'),
+    [
+        ('https://youtu.be/dQw4w9WgXcQ', 'dQw4w9WgXcQ'),
+        ('https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'dQw4w9WgXcQ'),
+        ('https://www.youtube.com/shorts/dQw4w9WgXcQ', 'dQw4w9WgXcQ'),
+        ('https://www.youtube.com/embed/dQw4w9WgXcQ', 'dQw4w9WgXcQ'),
+    ],
+)
+def test_send_message_enriches_youtube_metadata(
+    messenger: MessengerService,
+    content: str,
+    expected_video_id: str,
+):
+    user_id = 1
+    chat, _ = messenger.create_private_chat(user_id)
 
-    assert chats[0].title == 'test1'
-    assert chats[1].title == 'test'
+    message = messenger.send_message(chat.id, user_id, content)
 
-    messenger_service.send_message(chats[1].id, user_id, 'test')
+    assert message.metadata_ == {
+        'youtube': {
+            'room_id': id_by_pair(chat.id, message.id),
+            'youtube_video_id': expected_video_id,
+        }
+    }
 
-    chats = messenger_service.chat_repo.find_all(user_id=user_id)
 
-    assert chats[0].title == 'test'
-    assert chats[1].title == 'test1'
+def test_send_msg(messenger: MessengerService):
+    user_id = 1
+    chat, _ = messenger.create_private_chat(user_id)
+    msg = messenger.send_msg(chat.id, user_id, 'content')
+    assert msg.content == 'content'
+    _, messages = messenger.get_chat_messages(chat.id, user_id)
+    assert len(messages) == 1

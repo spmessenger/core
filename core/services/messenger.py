@@ -1,10 +1,20 @@
+import re
+from urllib.parse import urlparse, parse_qs
+from uuid import uuid4
+
 from core.entities import Chat, ChatType, Participant, Message
 from core.entities.chat_group import ChatGroup
 from core.entities.participant import DEFAULT_PIN_POSITION, PRIVATE_CHAT_PIN_POSITION
+from core.misc.utils.general import id_by_pair
 from core.repos.abc import AbstractChatRepo, AbstractChatGroupRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
+from core.services.activity import UserActivityService
+from core.services.notifier import MessengerNotifier
+from core.uow.messenger import MessengerUoWFactory
 
 
 class MessengerService:
+    _URL_REGEX = re.compile(r'((?:https?://|www\.)[^\s<]+)', re.IGNORECASE)
+
     def __init__(
         self,
         chat_repo: AbstractChatRepo,
@@ -12,12 +22,18 @@ class MessengerService:
         message_repo: AbstractMessageRepo,
         user_repo: AbstractUserRepo,
         chat_group_repo: AbstractChatGroupRepo | None = None,
+        uow_factory: MessengerUoWFactory | None = None,
+        activity_service: UserActivityService | None = None,
+        notifier: MessengerNotifier | None = None,
     ):
         self.chat_repo = chat_repo
         self.participant_repo = participant_repo
         self.message_repo = message_repo
         self.user_repo = user_repo
         self.chat_group_repo = chat_group_repo
+        self.uow_factory = uow_factory
+        self.activity_service = activity_service
+        self.notifier = notifier
 
     def _ensure_chat_group_repo(self) -> AbstractChatGroupRepo:
         if self.chat_group_repo is None:
@@ -34,6 +50,8 @@ class MessengerService:
         participant = self.get_chat_participant(
             chat_id=chat_id, user_id=user_id)
         messages = self.message_repo.find_all(chat_id=chat_id)
+        messages = [self._enrich_message_metadata(
+            message) for message in messages]
         self.participant_repo.reset_unread_messages_count(
             chat_id=chat_id, user_id=user_id)
         if messages:
@@ -60,6 +78,8 @@ class MessengerService:
             before_message_id=before_message_id,
             limit=limit,
         )
+        messages = [self._enrich_message_metadata(
+            message) for message in messages]
         if before_message_id is None and messages:
             participant = self.participant_repo.update_last_read_message(
                 chat_id=chat_id,
@@ -135,62 +155,180 @@ class MessengerService:
             raise ValueError(
                 'message cannot be reply and forward at the same time')
 
+        if reference_message_id is not None:
+            return self.reply(
+                chat_id=chat_id,
+                sender_id=sender_id,
+                content=content,
+                reference_message_id=reference_message_id,
+                connected_user_ids=connected_user_ids,
+            )
+
+        if forwarded_from_message_id is not None:
+            return self.forward(
+                chat_id=chat_id,
+                sender_id=sender_id,
+                content=content,
+                forwarded_from_message_id=forwarded_from_message_id,
+                connected_user_ids=connected_user_ids,
+            )
+
+        return self._save_message(
+            chat_id=chat_id,
+            sender_id=sender_id,
+            content=content,
+            participant=participant,
+            connected_user_ids=connected_user_ids,
+        )
+
+    def reply(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        reference_message_id: int,
+        connected_user_ids: set[int] | None = None,
+    ) -> Message:
+        participant = self.participant_repo.get_one(
+            chat_id=chat_id, user_id=sender_id)
         reference_author: str | None = None
         reference_content: str | None = None
-        if reference_message_id is not None:
-            reference_message = self.message_repo.get_one(
-                id=reference_message_id)
-            if reference_message.chat_id != chat_id:
-                raise ValueError(
-                    'reference_message_id must belong to the same chat')
-            # Resolve author via chat participants to avoid edge-case repo id lookup issues.
-            chat_participants = self.participant_repo.find_all(chat_id=chat_id)
-            reference_participant = next(
-                (
-                    participant
-                    for participant in chat_participants
-                    if participant.id == reference_message.participant_id
-                ),
-                None,
-            )
-            if reference_participant is not None:
-                reference_user = self.user_repo.find_one_by_id(
-                    reference_participant.user_id)
-                if reference_user is not None:
-                    reference_author = reference_user.username
-            reference_content = reference_message.content
 
+        reference_message = self.message_repo.get_one(id=reference_message_id)
+        if reference_message.chat_id != chat_id:
+            raise ValueError(
+                'reference_message_id must belong to the same chat')
+
+        # Resolve author via chat participants to avoid edge-case repo id lookup issues.
+        chat_participants = self.participant_repo.find_all(chat_id=chat_id)
+        reference_participant = next(
+            (
+                participant
+                for participant in chat_participants
+                if participant.id == reference_message.participant_id
+            ),
+            None,
+        )
+        if reference_participant is not None:
+            reference_user = self.user_repo.find_one_by_id(
+                reference_participant.user_id)
+            if reference_user is not None:
+                reference_author = reference_user.username
+        reference_content = reference_message.content
+
+        return self._save_message(
+            chat_id=chat_id,
+            sender_id=sender_id,
+            content=content,
+            participant=participant,
+            reference_message_id=reference_message_id,
+            reference_author=reference_author,
+            reference_content=reference_content,
+            connected_user_ids=connected_user_ids,
+        )
+
+    def forward(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        forwarded_from_message_id: int,
+        connected_user_ids: set[int] | None = None,
+    ) -> Message:
+        participant = self.participant_repo.get_one(
+            chat_id=chat_id, user_id=sender_id)
         forwarded_from_author: str | None = None
         forwarded_from_author_avatar_url: str | None = None
         forwarded_from_content: str | None = None
-        if forwarded_from_message_id is not None:
-            source_message = self.message_repo.get_one(
-                id=forwarded_from_message_id)
-            source_participant = self.participant_repo.find_one(
-                chat_id=source_message.chat_id,
-                user_id=sender_id,
-            )
-            if source_participant is None:
-                raise ValueError(
-                    'cannot forward message from inaccessible chat')
 
-            source_chat_participants = self.participant_repo.find_all(
-                chat_id=source_message.chat_id)
-            source_author_participant = next(
-                (
-                    participant
-                    for participant in source_chat_participants
-                    if participant.id == source_message.participant_id
-                ),
-                None,
+        source_message = self.message_repo.get_one(
+            id=forwarded_from_message_id)
+        source_participant = self.participant_repo.find_one(
+            chat_id=source_message.chat_id,
+            user_id=sender_id,
+        )
+        if source_participant is None:
+            raise ValueError('cannot forward message from inaccessible chat')
+
+        source_chat_participants = self.participant_repo.find_all(
+            chat_id=source_message.chat_id)
+        source_author_participant = next(
+            (
+                participant
+                for participant in source_chat_participants
+                if participant.id == source_message.participant_id
+            ),
+            None,
+        )
+        if source_author_participant is not None:
+            source_author_user = self.user_repo.find_one_by_id(
+                source_author_participant.user_id)
+            if source_author_user is not None:
+                forwarded_from_author = source_author_user.username
+                forwarded_from_author_avatar_url = source_author_user.avatar_url
+        forwarded_from_content = source_message.content
+
+        return self._save_message(
+            chat_id=chat_id,
+            sender_id=sender_id,
+            content=content,
+            participant=participant,
+            forwarded_from_message_id=forwarded_from_message_id,
+            forwarded_from_author=forwarded_from_author,
+            forwarded_from_author_avatar_url=forwarded_from_author_avatar_url,
+            forwarded_from_content=forwarded_from_content,
+            connected_user_ids=connected_user_ids,
+        )
+
+    def send_msg(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+    ):
+        with self.uow_factory() as uow:
+            participant = uow.participant_repo.get_one(
+                chat_id=chat_id,
+                user_id=sender_id
             )
-            if source_author_participant is not None:
-                source_author_user = self.user_repo.find_one_by_id(
-                    source_author_participant.user_id)
-                if source_author_user is not None:
-                    forwarded_from_author = source_author_user.username
-                    forwarded_from_author_avatar_url = source_author_user.avatar_url
-            forwarded_from_content = source_message.content
+            message = uow.message_repo.save(
+                Message.Creation(
+                    content=content, chat_id=chat_id,
+                    participant_id=participant.id,
+                    metadata_=self._create_metadata(content),
+                )
+            )
+            uow.chat_repo.update_last_message(chat_id, message.id)
+            active_participant_ids = self.activity_service.get_active_participant_ids(
+                chat_id)
+            uow.participant_repo.increment_unread_messages_count(
+                chat_id,
+                excluded_participand_ids=active_participant_ids
+            )
+            uow.commit()
+
+        self.notifier.notify_new_message(chat_id, message)
+        return message
+
+    def _save_message(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        participant: Participant | None = None,
+        reference_message_id: int | None = None,
+        reference_author: str | None = None,
+        reference_content: str | None = None,
+        forwarded_from_message_id: int | None = None,
+        forwarded_from_author: str | None = None,
+        forwarded_from_author_avatar_url: str | None = None,
+        forwarded_from_content: str | None = None,
+        connected_user_ids: set[int] | None = None,
+        metadata_: dict | None = None,
+    ) -> Message:
+        if participant is None:
+            participant = self.participant_repo.get_one(
+                chat_id=chat_id, user_id=sender_id)
 
         message = self.message_repo.save(
             Message.Creation(
@@ -204,6 +342,7 @@ class MessengerService:
                 forwarded_from_author_avatar_url=forwarded_from_author_avatar_url,
                 forwarded_from_content=forwarded_from_content,
                 content=content,
+                metadata_=metadata_ or {},
             )
         )
         self.chat_repo.update_last_message(chat_id, message.id)
@@ -214,24 +353,52 @@ class MessengerService:
             excluded_user_ids=excluded_user_ids,
         )
         self.post_message(message)
-        return message
+        return self._enrich_message_metadata(message)
 
-    def reply():
-        ...
-
-    def forward():
-        ...
-
-    def _create_metadata(self, message: Message) -> dict:
+    def _create_metadata(self, content: str) -> dict:
         metadata = {}
-        youtube_meta = self._create_metadata_youtube(message)
+        youtube_meta = self._create_metadata_youtube(content)
         if youtube_meta:
             metadata['youtube'] = youtube_meta
         return metadata
 
-    def _create_metadata_youtube(self, message: Message) -> dict | None:
-        ...
+    def _create_metadata_youtube(self, content: str) -> dict | None:
+        def extract_youtube_video_id(url_value: str) -> str | None:
+            parsed = urlparse(url_value)
+            host = parsed.hostname.lower().replace('www.', '') if parsed.hostname else ''
+            if host == 'youtu.be':
+                path_parts = [part for part in parsed.path.split('/') if part]
+                return path_parts[0] if path_parts else None
+            if host in {'youtube.com', 'm.youtube.com'}:
+                if parsed.path == '/watch':
+                    video_id = parse_qs(parsed.query).get('v', [None])[0]
+                    return video_id or None
+                path_parts = [part for part in parsed.path.split('/') if part]
+                if len(path_parts) >= 2 and path_parts[0] in {'shorts', 'embed'}:
+                    return path_parts[1]
+            return None
 
+        for match in self._URL_REGEX.finditer(content):
+            raw_url = match.group(1)
+            normalized_url = (
+                raw_url
+                if raw_url.startswith(('http://', 'https://'))
+                else f'https://{raw_url}'
+            )
+            video_id = extract_youtube_video_id(normalized_url)
+            if video_id is None:
+                continue
+
+            return {
+                'room_id': uuid4().hex,
+                'youtube_video_id': video_id,
+            }
+
+        return None
+
+    def _enrich_message_metadata(self, message: Message) -> Message:
+        message.metadata_ = self._create_metadata(message)
+        return message
 
     def delete_message(
         self,

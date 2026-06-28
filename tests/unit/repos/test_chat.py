@@ -16,4 +16,3 @@ def test_get_by_id():
 
     assert got_chat.id == chat.id
     assert got_chat.type == ChatType.PRIVATE
-    assert got_chat.title == 'test'

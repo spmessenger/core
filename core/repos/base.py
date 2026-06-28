@@ -12,40 +12,45 @@ class DbRepo(Generic[T]):
     model: DbBase
     entity_model: T
 
+    def __init__(self, auto_commit: bool = True, session: Session | None = None):
+        self._auto_commit = auto_commit
+        self._session = session  # todo: need to inject, not to create new instance
+
     @asession_factory
     async def adelete(self, id: int, *, session: AsyncSession) -> bool:
         db_model = await self._adelete(id, session)
-        await session.commit()
+        await self._ado_commit_with_condition(session)
         return await self.apost_delete(id, db_model)
 
     @asession_factory
     async def aupdate(self, obj: Base, consider_all: bool = False, *, session: AsyncSession) -> Base | None:
         db_model = await self._aupdate(obj=obj, consider_all=consider_all, session=session)
-        await session.commit()
+        await self._ado_commit_with_condition(session)
         return await self.apost_update(obj, db_model)
 
     @session_factory
     def update(self, obj: Base, consider_all: bool = False, *, session: Session) -> Base | None:
-        db_model = self._update(obj=obj, consider_all=consider_all, session=session)
-        session.commit()
+        db_model = self._update(
+            obj=obj, consider_all=consider_all, session=session)
+        self._do_commit_with_condition(session)
         return self.post_update(obj, db_model)
 
     @asession_factory
     async def asave(self, obj: Base, *, session: AsyncSession) -> Base | None:
         db_model = await self._asave(obj, session)
-        await session.commit()
+        await self._ado_commit_with_condition(session)
         return await self.apost_save(obj, db_model)
 
     @session_factory
     def save(self, obj: Base, *, session: Session) -> Base | None:
         db_model = self._save(obj, session)
-        session.commit()
+        self._do_commit_with_condition(session)
         return self.post_save(obj, db_model)
 
     @asession_factory
     async def asave_many(self, objs: Iterable[Base], *, session: AsyncSession) -> list[Base]:
         await self._asave_many(objs, session)
-        await session.commit()
+        await self._ado_commit_with_condition(session)
 
     async def apost_save(self, obj: Base, db_model: DbBase):
         pass
@@ -127,6 +132,18 @@ class DbRepo(Generic[T]):
             pass  # TODO: need to log here
         return db_model
 
+    def _do_commit_with_condition(self, session: Session):
+        if self._auto_commit:
+            session.commit()
+        else:
+            session.flush()
+
+    async def _ado_commit_with_condition(self, session: AsyncSession):
+        if self._auto_commit:
+            await session.commit()
+        else:
+            await session.flush()
+
     def _get_update_model_dump(self, obj: Base, consider_all: bool = False) -> dict:
         return obj.model_dump(exclude={'id'}, exclude_unset=not consider_all)
 
@@ -161,7 +178,8 @@ class InMemoryRepo(Generic[T]):
         self._storage.append(entity)
         return entity
 
-    def _update(self, upd_ent: Base.Update) -> T:  # todo: need to replace Base.Update with T.Update
+    # todo: need to replace Base.Update with T.Update
+    def _update(self, upd_ent: Base.Update) -> T:
         entity = self._find_by('id', upd_ent.id)
         if entity is None:
             raise ValueError(f"Entity with id {upd_ent.id} not found")

@@ -1,4 +1,5 @@
 from typing import NewType
+from pydantic import Field
 from .base import Base
 
 
@@ -16,6 +17,7 @@ class Message(Base):
     forwarded_from_author: str | None = None
     forwarded_from_author_avatar_url: str | None = None
     forwarded_from_content: str | None = None
+    metadata_: dict = Field(default_factory=dict)
     content: str
     created_at_timestamp: float
 
@@ -29,4 +31,5 @@ class Message(Base):
         forwarded_from_author: str | None = None
         forwarded_from_author_avatar_url: str | None = None
         forwarded_from_content: str | None = None
+        metadata_: dict = Field(default_factory=dict)
         content: str

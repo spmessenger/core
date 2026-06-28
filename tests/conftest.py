@@ -1,3 +1,5 @@
+from core.repos.chat_group import DbChatGroupRepo
+from core.uow.messenger import MessengerUoWFactory
 import pytest
 from core.repos.participant import DbParticipantRepo
 from core.tests.utils import clear_in_memory_repos
@@ -72,7 +74,14 @@ def message_repo():
 
 @pytest.fixture
 def messenger_service(chat_repo, participant_repo, user_repo, message_repo):
-    return MessengerService(chat_repo, participant_repo, message_repo, user_repo)
+    uow_factory = MessengerUoWFactory(
+        DbChatRepo,
+        DbChatGroupRepo,
+        DbParticipantRepo,
+        DbUserRepo,
+        DbMessageRepo
+    )
+    return MessengerService(chat_repo, participant_repo, message_repo, user_repo, None, uow_factory)
 
 
 @pytest.fixture
