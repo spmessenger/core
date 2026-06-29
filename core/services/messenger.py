@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 import re
 from urllib.parse import urlparse, parse_qs
 from uuid import uuid4
@@ -50,8 +51,6 @@ class MessengerService:
         participant = self.get_chat_participant(
             chat_id=chat_id, user_id=user_id)
         messages = self.message_repo.find_all(chat_id=chat_id)
-        messages = [self._enrich_message_metadata(
-            message) for message in messages]
         self.participant_repo.reset_unread_messages_count(
             chat_id=chat_id, user_id=user_id)
         if messages:
@@ -303,11 +302,24 @@ class MessengerService:
                 chat_id)
             uow.participant_repo.increment_unread_messages_count(
                 chat_id,
-                excluded_participand_ids=active_participant_ids
+                excluded_participant_ids=active_participant_ids
             )
+            participants = uow.participant_repo.find_all(chat_id=chat_id)
             uow.commit()
 
         self.notifier.notify_new_message(chat_id, message)
+        for p in participants:
+            self.notifier.notify_chat_update(
+                p.user_id,
+                Chat.EventUpdate(
+                    unread_messages_count=p.unread_messages_count,
+                    last_message=message.content,
+                    last_message_at=datetime.fromtimestamp(
+                        float(message.created_at_timestamp),
+                        tz=UTC,
+                    ).isoformat(),
+                )
+            )
         return message
 
     def _save_message(
@@ -342,7 +354,7 @@ class MessengerService:
                 forwarded_from_author_avatar_url=forwarded_from_author_avatar_url,
                 forwarded_from_content=forwarded_from_content,
                 content=content,
-                metadata_=metadata_ or {},
+                metadata_=self._create_metadata(content),
             )
         )
         self.chat_repo.update_last_message(chat_id, message.id)
@@ -353,7 +365,7 @@ class MessengerService:
             excluded_user_ids=excluded_user_ids,
         )
         self.post_message(message)
-        return self._enrich_message_metadata(message)
+        return message
 
     def _create_metadata(self, content: str) -> dict:
         metadata = {}
@@ -395,10 +407,6 @@ class MessengerService:
             }
 
         return None
-
-    def _enrich_message_metadata(self, message: Message) -> Message:
-        message.metadata_ = self._create_metadata(message)
-        return message
 
     def delete_message(
         self,

@@ -42,6 +42,7 @@ class AbstractParticipantRepo(ABC):
         self,
         chat_id: int,
         excluded_user_ids: set[int] | None = None,
+        excluded_participant_ids: set[int] | None = None,
     ) -> list[Participant]:
         pass
 
@@ -160,6 +161,7 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         self,
         chat_id: int,
         excluded_user_ids: set[int] | None = None,
+        excluded_participant_ids: set[int] | None = None,
         *,
         session: Session,
     ) -> list[Participant]:
@@ -170,6 +172,8 @@ class DbParticipantRepo(DbRepo, AbstractParticipantRepo):
         )
         if excluded_user_ids:
             query = query.where(~self.model.user_id.in_(excluded_user_ids))
+        if excluded_participant_ids:
+            query = query.where(~self.model.id.in_(excluded_participant_ids))
         query = query.returning(self.model)
         updated = session.execute(query).scalars().all()
         session.commit()

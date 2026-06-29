@@ -1,4 +1,8 @@
+from core.eventbus.publisher import RedisEventPublisher
+from core.repos.activity import RedisActivityRepo
 from core.repos.chat_group import DbChatGroupRepo
+from core.services.activity import UserActivityService
+from core.services.notifier import MessengerNotifier
 from core.uow.messenger import MessengerUoWFactory
 import pytest
 from core.repos.participant import DbParticipantRepo
@@ -73,7 +77,24 @@ def message_repo():
 
 
 @pytest.fixture
-def messenger_service(chat_repo, participant_repo, user_repo, message_repo):
+def activity_service():
+    return UserActivityService(RedisActivityRepo())
+
+
+@pytest.fixture
+def notifier_service():
+    return MessengerNotifier(RedisEventPublisher())
+
+
+@pytest.fixture
+def messenger_service(
+    chat_repo,
+    participant_repo,
+    user_repo,
+    message_repo,
+    activity_service,
+    notifier_service,
+):
     uow_factory = MessengerUoWFactory(
         DbChatRepo,
         DbChatGroupRepo,
@@ -81,7 +102,16 @@ def messenger_service(chat_repo, participant_repo, user_repo, message_repo):
         DbUserRepo,
         DbMessageRepo
     )
-    return MessengerService(chat_repo, participant_repo, message_repo, user_repo, None, uow_factory)
+    return MessengerService(
+        chat_repo,
+        participant_repo,
+        message_repo,
+        user_repo,
+        None,
+        uow_factory,
+        activity_service,
+        notifier_service,
+    )
 
 
 @pytest.fixture

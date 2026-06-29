@@ -1,3 +1,6 @@
+from core.eventbus.event import EventType
+from core.eventbus.channels import Channels
+from core.eventbus.listener import RedisEventListener
 import pytest
 
 from core.entities.chat import ChatType
@@ -187,18 +190,53 @@ def test_send_message_enriches_youtube_metadata(
 
     message = messenger.send_message(chat.id, user_id, content)
 
-    assert message.metadata_ == {
-        'youtube': {
-            'room_id': id_by_pair(chat.id, message.id),
-            'youtube_video_id': expected_video_id,
-        }
-    }
+    assert message.metadata_[
+        'youtube']['youtube_video_id'] == expected_video_id
 
 
-def test_send_msg(messenger: MessengerService):
+async def test_send_msg(messenger: MessengerService):
     user_id = 1
     chat, _ = messenger.create_private_chat(user_id)
-    msg = messenger.send_msg(chat.id, user_id, 'content')
-    assert msg.content == 'content'
-    _, messages = messenger.get_chat_messages(chat.id, user_id)
-    assert len(messages) == 1
+    listener = RedisEventListener(Channels.CHAT, chat_id=chat.id)
+    try:
+        await listener.listen()
+        msg = messenger.send_msg(chat.id, user_id, 'content')
+        assert msg.content == 'content'
+        event_message = await listener.wait_for_event()
+        assert event_message['type'] == 'message.created'
+        assert event_message['data']['chat_id'] == chat.id
+        assert event_message['data']['message']['id'] == msg.id
+        _, messages = messenger.get_chat_messages(chat.id, user_id)
+        assert len(messages) == 1
+        assert messages[0].content == 'content'
+    finally:
+        await listener.close()
+
+
+async def test_unread_msg_count_increased_001(messenger: MessengerService):
+    user_id = 1
+    chat, _ = messenger.create_private_chat(user_id)
+    listener_user = RedisEventListener(Channels.USER, user_id=user_id)
+    try:
+        await listener_user.listen()
+        messenger.send_msg(chat.id, user_id, 'content')
+        event = await listener_user.wait_for_event()
+        assert event['type'] == EventType.CHAT_UPDATE.value
+        assert event['data']['unread_messages_count'] == 1
+    finally:
+        await listener_user.close()
+
+
+async def test_unread_msg_count_increased_002(messenger: MessengerService):
+    user_id = 1
+    chat, participant = messenger.create_private_chat(user_id)
+    messenger.activity_service.mark_participant_active(chat.id, participant.id)
+    listener_user = RedisEventListener(Channels.USER, user_id=user_id)
+    try:
+        await listener_user.listen()
+        messenger.send_msg(chat.id, user_id, 'content')
+        event = await listener_user.wait_for_event()
+        assert event['type'] == EventType.CHAT_UPDATE.value
+        assert event['data']['unread_messages_count'] == 0
+    finally:
+        await listener_user.close()

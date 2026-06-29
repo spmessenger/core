@@ -1,5 +1,6 @@
+from __future__ import annotations
 from typing import NewType
-from pydantic import Field
+from pydantic import BaseModel, Field
 from .base import Base
 
 
@@ -20,6 +21,12 @@ class Message(Base):
     metadata_: dict = Field(default_factory=dict)
     content: str
     created_at_timestamp: float
+    reply_to: ReplyTo | None = None
+
+    class ReplyTo(BaseModel):
+        participant_id: int
+        message_id: int
+        content: str
 
     class Creation(Base.Creation):
         chat_id: int

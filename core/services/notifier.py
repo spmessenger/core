@@ -1,6 +1,7 @@
+from core.entities.chat import Chat
 from core.entities.message import Message
 from core.eventbus.channels import Channels
-from core.eventbus.engine import EventPublisher
+from core.eventbus.publisher import EventPublisher
 from core.eventbus.builder import EventPayloadBuilder
 
 
@@ -13,4 +14,10 @@ class MessengerNotifier:
         self.puslisher.publish(
             Channels.CHAT.build(chat_id=chat_id),
             EventPayloadBuilder.message_created(chat_id, message),
+        )
+
+    def notify_chat_update(self, user_id: int, update: Chat.EventUpdate) -> None:
+        self.puslisher.publish(
+            Channels.USER.build(user_id=user_id),
+            EventPayloadBuilder.chat_update(update),
         )

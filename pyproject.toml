@@ -30,6 +30,7 @@ tests = "pytest:main"
 
 [tool.poetry.group.dev.dependencies]
 pytest-env = "<1.6.0"
+pytest-asyncio = "^1.4.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -39,6 +40,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-s -v"
+asyncio_mode = "auto"
 env = [
     "DB_TYPE=in_memory",
 ]

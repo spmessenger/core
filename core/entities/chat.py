@@ -1,5 +1,5 @@
 from enum import StrEnum
-from pydantic import Field
+from pydantic import BaseModel, Field
 from .base import Base
 
 
@@ -32,3 +32,11 @@ class Chat(Base):
 
     class PrivateChatCreation(Creation):
         type: ChatType = ChatType.PRIVATE
+
+    class EventUpdate(BaseModel):
+        title: str | None = None
+        avatar_url: str | None = None
+        last_message: str | None = None
+        last_message_at: str | None = None
+        unread_messages_count: int = 0
+        pin_position: int = 0
