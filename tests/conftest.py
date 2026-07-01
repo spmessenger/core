@@ -1,5 +1,5 @@
 from core.eventbus.publisher import RedisEventPublisher
-from core.repos.activity import RedisActivityRepo
+from core.repos.activity import RedisActivityRepo, create_redis_client
 from core.repos.chat_group import DbChatGroupRepo
 from core.services.activity import UserActivityService
 from core.services.notifier import MessengerNotifier
@@ -8,15 +8,23 @@ import pytest
 from core.repos.participant import DbParticipantRepo
 from core.tests.utils import clear_in_memory_repos
 from core.services import AuthService, MessengerService
-from core.repos import InMemoryChatRepo, InMemoryParticipantRepo, InMemoryUserRepo, InMemoryMessageRepo, DbChatRepo, DbUserRepo, DbMessageRepo
+from core.repos import InMemoryChatRepo, InMemoryParticipantRepo, InMemoryUserRepo, InMemoryMessageRepo, DbChatRepo, DbUserRepo, DbMessageRepo, DbReplyRepo
 from db.misc import create_tables, drop_tables
+
+
+def clear_redis_state():
+    redis = create_redis_client()
+    redis.flushdb()
+    redis.close()
 
 
 @pytest.fixture(scope='function', autouse=True)
 def create_and_drop_tables():
+    clear_redis_state()
     create_tables()
     yield
     drop_tables()
+    clear_redis_state()
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -100,7 +108,8 @@ def messenger_service(
         DbChatGroupRepo,
         DbParticipantRepo,
         DbUserRepo,
-        DbMessageRepo
+        DbMessageRepo,
+        DbReplyRepo,
     )
     return MessengerService(
         chat_repo,

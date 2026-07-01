@@ -3,6 +3,7 @@ from .chat_group import InMemoryChatGroupRepo, DbChatGroupRepo, AbstractChatGrou
 from .participant import InMemoryParticipantRepo, DbParticipantRepo, AbstractParticipantRepo
 from .user import InMemoryUserRepo, DbUserRepo, AbstractUserRepo
 from .message import InMemoryMessageRepo, DbMessageRepo, AbstractMessageRepo
+from .reply import InMemoryReplyRepo, DbReplyRepo, AbstractReplyRepo
 from .room import InMemoryYouTubeRoomRepo, DbYouTubeRoomRepo, AbstractYouTubeRoomRepo
 from .activity import AbstractActivityRepo, RedisActivityRepo, create_redis_client
 
@@ -13,6 +14,7 @@ __all__ = [
     'AbstractParticipantRepo',
     'AbstractUserRepo',
     'AbstractMessageRepo',
+    'AbstractReplyRepo',
     'AbstractYouTubeRoomRepo',
     'AbstractActivityRepo',
     'InMemoryChatRepo',
@@ -20,10 +22,12 @@ __all__ = [
     'InMemoryParticipantRepo',
     'InMemoryUserRepo',
     'InMemoryMessageRepo',
+    'InMemoryReplyRepo',
     'DbChatRepo',
     'DbChatGroupRepo',
     'DbUserRepo',
     'DbMessageRepo',
+    'DbReplyRepo',
     'DbParticipantRepo',
     'InMemoryYouTubeRoomRepo',
     'DbYouTubeRoomRepo',

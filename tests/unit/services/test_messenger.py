@@ -240,3 +240,8 @@ async def test_unread_msg_count_increased_002(messenger: MessengerService):
         assert event['data']['unread_messages_count'] == 0
     finally:
         await listener_user.close()
+
+
+async def test_reply(messenger: MessengerService):
+    user_id = 1
+    ...

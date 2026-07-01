@@ -4,6 +4,7 @@ from .chat_group import ChatGroup
 from .participant import Participant
 from .user import User
 from .message import Message
+from .reply import Reply
 
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     'Participant',
     'User',
     'Message',
+    'Reply',
 ]

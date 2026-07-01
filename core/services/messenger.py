@@ -6,11 +6,12 @@ from uuid import uuid4
 from core.entities import Chat, ChatType, Participant, Message
 from core.entities.chat_group import ChatGroup
 from core.entities.participant import DEFAULT_PIN_POSITION, PRIVATE_CHAT_PIN_POSITION
+from core.entities.reply import Reply
 from core.misc.utils.general import id_by_pair
 from core.repos.abc import AbstractChatRepo, AbstractChatGroupRepo, AbstractParticipantRepo, AbstractUserRepo, AbstractMessageRepo
 from core.services.activity import UserActivityService
 from core.services.notifier import MessengerNotifier
-from core.uow.messenger import MessengerUoWFactory
+from core.uow.messenger import MessengerUnitOfWork, MessengerUoWFactory
 
 
 class MessengerService:
@@ -279,6 +280,41 @@ class MessengerService:
             connected_user_ids=connected_user_ids,
         )
 
+    def reply_new(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        reply_to_id: int,
+    ):
+        with self.uow_factory() as uow:
+            reply_to_msg = uow.message_repo.get_one(id=reply_to_id)
+            message, participants = self._save_msg_in_uow(
+                uow, chat_id, sender_id, content)
+            uow.reply_repo.save(
+                Reply.Creation(
+                    replying_msg_id=message.id,
+                    reply_to_msg_id=reply_to_id
+                )
+            )
+            message.reply_to = Message.ReplyTo.model_validate(reply_to_msg)
+            uow.commit()
+
+            self.notifier.notify_new_message(chat_id, message)
+            for p in participants:
+                self.notifier.notify_chat_update(
+                    p.user_id,
+                    Chat.EventUpdate(
+                        unread_messages_count=p.unread_messages_count,
+                        last_message=message.content,
+                        last_message_at=datetime.fromtimestamp(
+                            float(message.created_at_timestamp),
+                            tz=UTC,
+                        ).isoformat(),
+                    )
+                )
+            return message
+
     def send_msg(
         self,
         chat_id: int,
@@ -286,25 +322,8 @@ class MessengerService:
         content: str,
     ):
         with self.uow_factory() as uow:
-            participant = uow.participant_repo.get_one(
-                chat_id=chat_id,
-                user_id=sender_id
-            )
-            message = uow.message_repo.save(
-                Message.Creation(
-                    content=content, chat_id=chat_id,
-                    participant_id=participant.id,
-                    metadata_=self._create_metadata(content),
-                )
-            )
-            uow.chat_repo.update_last_message(chat_id, message.id)
-            active_participant_ids = self.activity_service.get_active_participant_ids(
-                chat_id)
-            uow.participant_repo.increment_unread_messages_count(
-                chat_id,
-                excluded_participant_ids=active_participant_ids
-            )
-            participants = uow.participant_repo.find_all(chat_id=chat_id)
+            message, participants = self._save_msg_in_uow(
+                uow, chat_id, sender_id, content)
             uow.commit()
 
         self.notifier.notify_new_message(chat_id, message)
@@ -321,6 +340,34 @@ class MessengerService:
                 )
             )
         return message
+
+    def _save_msg_in_uow(
+        self,
+        uow: MessengerUnitOfWork,
+        chat_id: int,
+        sender_id: int,
+        content: str
+    ):
+        participant = uow.participant_repo.get_one(
+            chat_id=chat_id,
+            user_id=sender_id
+        )
+        message = uow.message_repo.save(
+            Message.Creation(
+                content=content, chat_id=chat_id,
+                participant_id=participant.id,
+                metadata_=self._create_metadata(content),
+            )
+        )
+        uow.chat_repo.update_last_message(chat_id, message.id)
+        active_participant_ids = self.activity_service.get_active_participant_ids(
+            chat_id)
+        uow.participant_repo.increment_unread_messages_count(
+            chat_id,
+            excluded_participant_ids=active_participant_ids
+        )
+        participants = uow.participant_repo.find_all(chat_id=chat_id)
+        return message, participants
 
     def _save_message(
         self,
