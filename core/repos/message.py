@@ -8,6 +8,10 @@ from .base import InMemoryRepo, DbRepo
 
 class AbstractMessageRepo(ABC):
     @abstractmethod
+    def assign_youtube_room(self, message_id: int, room_id: int) -> None:
+        pass
+
+    @abstractmethod
     def get_one(self, id: int) -> Message:
         pass
 
@@ -41,6 +45,21 @@ class DbMessageRepo(DbRepo, AbstractMessageRepo):
     model = ModelMessage
     chat_last_message_association_model = chat_last_message_association_table
     entity_model = Message
+
+    @session_factory
+    def assign_youtube_room(self, message_id: int, room_id: int, *, session: Session) -> None:
+        query = select(self.model).where(self.model.id == message_id)
+        message = session.execute(query).scalar_one_or_none()
+        if message is None:
+            raise ValueError(f'Message with id={message_id} not found')
+
+        metadata = dict(message.metadata_ or {})
+        rooms_metadata = dict(metadata.get('rooms') or {})
+        rooms_metadata['youtube'] = room_id
+        metadata['rooms'] = rooms_metadata
+        message.metadata_ = metadata
+
+        self._do_commit_with_condition(session)
 
     @session_factory
     def get_one(self, id: int, *, session: Session) -> Message:
@@ -126,6 +145,17 @@ class DbMessageRepo(DbRepo, AbstractMessageRepo):
 
 
 class InMemoryMessageRepo(AbstractMessageRepo, InMemoryRepo[Message]):
+    def assign_youtube_room(self, message_id: int, room_id: int) -> None:
+        message = self.find_one(id=message_id)
+        if message is None:
+            raise ValueError(f'Message with id={message_id} not found')
+
+        metadata = dict(message.metadata_ or {})
+        rooms_metadata = dict(metadata.get('rooms') or {})
+        rooms_metadata['youtube'] = room_id
+        metadata['rooms'] = rooms_metadata
+        message.metadata_ = metadata
+
     def get_one(self, id: int) -> Message:
         message = self.find_one(id=id)
         if message is None:

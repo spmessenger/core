@@ -78,8 +78,7 @@ class MessengerService:
             before_message_id=before_message_id,
             limit=limit,
         )
-        messages = [self._enrich_message_metadata(
-            message) for message in messages]
+
         if before_message_id is None and messages:
             participant = self.participant_repo.update_last_read_message(
                 chat_id=chat_id,
@@ -297,7 +296,8 @@ class MessengerService:
                     reply_to_msg_id=reply_to_id
                 )
             )
-            message.reply_to = Message.ReplyTo.model_validate(reply_to_msg)
+            message.reply_to = Message.ReplyTo.model_validate(
+                reply_to_msg, from_attributes=True)
             uow.commit()
 
             self.notifier.notify_new_message(chat_id, message)

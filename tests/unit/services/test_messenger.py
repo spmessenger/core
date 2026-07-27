@@ -244,4 +244,25 @@ async def test_unread_msg_count_increased_002(messenger: MessengerService):
 
 async def test_reply(messenger: MessengerService):
     user_id = 1
-    ...
+    chat, _ = messenger.create_private_chat(user_id)
+    listener = RedisEventListener(Channels.CHAT, chat_id=chat.id)
+    try:
+        msg = messenger.send_msg(chat.id, user_id, 'content')
+        await listener.listen()
+        reply = messenger.reply_new(msg.id, user_id, 'reply', msg.id)
+        assert reply.content == 'reply'
+        assert reply.reply_to.content == 'content'
+        event_message = await listener.wait_for_event()
+        assert event_message['type'] == 'message.created'
+        assert event_message['data']['chat_id'] == chat.id
+        assert event_message['data']['message']['id'] == reply.id
+        assert event_message['data']['message']['reply_to']['id'] == msg.id
+        assert event_message['data']['message']['reply_to']['content'] == 'content'
+        assert event_message['data']['message']['content'] == 'reply'
+        _, messages = messenger.get_chat_messages(chat.id, user_id)
+        assert len(messages) == 2
+        assert messages[0].content == 'content'
+        assert messages[1].content == 'reply'
+        assert messages[1].reply_to.content == 'content'
+    finally:
+        await listener.close()

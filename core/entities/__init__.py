@@ -5,6 +5,7 @@ from .participant import Participant
 from .user import User
 from .message import Message
 from .reply import Reply
+from .room import Room, YouTubeRoom
 
 
 __all__ = [
@@ -16,4 +17,6 @@ __all__ = [
     'User',
     'Message',
     'Reply',
+    'Room',
+    'YouTubeRoom',
 ]

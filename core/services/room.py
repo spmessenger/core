@@ -1,16 +1,39 @@
-from core.entities.room import YouTubeRoomModel
-from core.repos.room import AbstractYouTubeRoomRepo
-from core.misc.utils.general import id_by_pair
+from uuid import uuid4
+
+from core.entities.room import RoomType, YouTubeRoom
+from core.uow.room import RoomUoWFactory
 
 
-class YouTubeRoom:
-    def __init__(self, repo: AbstractYouTubeRoomRepo):
-        self.repo = repo
+class BaseRoomService:
+    def join(self, room_id: str):
+        raise NotImplementedError()
 
-    def get_room(self, chat_id: int, message_id: int) -> YouTubeRoomModel:
-        room_id = id_by_pair(chat_id, message_id)
-        room = self.repo.find_by_id(room_id)
-        if room is None:
-            room = self.repo.create(YouTubeRoomModel.Creation(
-                id=room_id, chat_id=chat_id, message_id=message_id))
-        return YouTubeRoomModel(id=room.id, chat_id=room.chat_id, message_id=room.message_id)
+    def leave(self, room_id: str):
+        raise NotImplementedError()
+
+    def create(self):
+        raise NotImplementedError()
+
+    def gen_room_id(self):
+        return uuid4().hex
+
+
+class YouTubeRoomService(BaseRoomService):
+    def __init__(self, uow_factory: RoomUoWFactory):
+        self.uow_factory = uow_factory
+
+    def create(self, youtube_video_id: str, user_id: int | None = None, message_id: int | None = None):
+        with self.uow_factory() as uow:
+            room = uow.youtube_room_repo.save(
+                YouTubeRoom.Creation(
+                    type=RoomType.YOUTUBE.value,
+                    type_specific_metadata=YouTubeRoom.SpecificMetadata(
+                        youtube_video_id=youtube_video_id,
+                    ).model_dump(),
+                    created_at=uow.current_time(),
+                )
+            )
+            if message_id:
+                uow.message_repo.assign_youtube_room(message_id, room.id)
+            uow.commit()
+        return room

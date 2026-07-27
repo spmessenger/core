@@ -25,7 +25,7 @@ class Message(Base):
 
     class ReplyTo(BaseModel):
         participant_id: int
-        message_id: int
+        id: MessageId
         content: str
 
     class Creation(Base.Creation):

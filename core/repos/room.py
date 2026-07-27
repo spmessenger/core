@@ -1,51 +1,49 @@
 from abc import ABC, abstractmethod
 from sqlalchemy import select
 
-from core.entities.room import YouTubeRoomModel
-from db.models import YouTubeRoom as YouTubeRoomDbModel
+from core.entities.room import Room
+from db.models import Room as RoomModel
 from db.session import session_factory, Session
-from .base import InMemoryRepo, DbRepo
+from .base import DbRepo, InMemoryRepo
 
 
-class AbstractYouTubeRoomRepo(ABC):
+class AbstractRoomRepo(ABC):
     @abstractmethod
-    def find_by_id(self, room_id: int) -> YouTubeRoomModel | None:
+    def find_by_id(self, room_id: int) -> Room | None:
         pass
 
     @abstractmethod
-    def create(self, room: YouTubeRoomModel.Creation) -> YouTubeRoomModel:
+    def save(self, room: Room.Creation) -> Room:
         pass
 
 
-class DbYouTubeRoomRepo(DbRepo, AbstractYouTubeRoomRepo):
-    model = YouTubeRoomDbModel
-    entity_model = YouTubeRoomModel
+class DbRoomRepo(DbRepo, AbstractRoomRepo):
+    model = RoomModel
+    entity_model = Room
 
     @session_factory
-    def find_by_id(self, room_id: int, *, session: Session) -> YouTubeRoomModel | None:
-        query = (
-            select(self.model)
-            .where(self.model.id == room_id)
-        )
+    def find_by_id(self, room_id: int, *, session: Session) -> Room | None:
+        query = select(self.model).where(self.model.id == room_id)
         room = session.execute(query).scalar_one_or_none()
         if room is None:
             return None
-        return YouTubeRoomModel.model_validate(room, from_attributes=True)
-
-    @session_factory
-    def create(self, room: YouTubeRoomModel.Creation, *, session: Session) -> YouTubeRoomModel:
-        return super().save(room, session=session)
+        return Room.model_validate(room, from_attributes=True)
 
 
-class InMemoryYouTubeRoomRepo(InMemoryRepo[YouTubeRoomModel], AbstractYouTubeRoomRepo):
-    def find_by_id(self, room_id: int) -> YouTubeRoomModel | None:
+class InMemoryRoomRepo(InMemoryRepo[Room], AbstractRoomRepo):
+    def find_by_id(self, room_id: int) -> Room | None:
         return self._find_by('id', room_id)
 
-    def create(self, room: YouTubeRoomModel.Creation) -> YouTubeRoomModel:
-        entity = YouTubeRoomModel(
-            id=room.id,
-            chat_id=room.chat_id,
-            message_id=room.message_id,
+    def save(self, room: Room.Creation) -> Room:
+        entity = Room(
+            id=0,
+            type=room.type,
+            type_specific_metadata=room.type_specific_metadata,
+            created_at=room.created_at,
         )
-        self._storage.append(entity)
-        return entity
+        return self._save(entity)
+
+
+AbstractYouTubeRoomRepo = AbstractRoomRepo
+DbYouTubeRoomRepo = DbRoomRepo
+InMemoryYouTubeRoomRepo = InMemoryRoomRepo
